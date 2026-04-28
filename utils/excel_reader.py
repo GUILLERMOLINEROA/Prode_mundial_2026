@@ -19,6 +19,13 @@
 #   - Categorías especiales: Figura, Goleador, Revelación, Decepción,
 #     Mejor 1era Fase, Peor Equipo
 #
+# Pestaña "Total Results":
+#   - Tabla de 48 filas con la clasificación completa del torneo
+#   - Columnas: A=Posición, B=Fase alcanzada, D=País, E=Puntos,
+#     F=G(ganados), G=E(empates), H=P(perdidos), I=Dif, J=G+, K=G-
+#   - FUENTE CLAVE: nos dice qué equipos llegaron a cada ronda
+#     según las predicciones del participante
+#
 # Cada participante tiene su propio archivo .xlsm
 # Se leen todos los archivos de la carpeta data/participantes/
 # =============================================================================
@@ -27,7 +34,7 @@ import pandas as pd
 import streamlit as st
 import os
 import glob
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set
 
 
 # --- Ruta por defecto de la carpeta de participantes ---
@@ -37,13 +44,11 @@ DEFAULT_PARTICIPANTES_DIR = os.path.join("data", "participantes")
 HOJA_GRUPOS = "Groups Stage"
 HOJA_ELIMINATORIAS = "Round of 32 & Round of 16"
 HOJA_FINAL = "Quarter, Semis & Final"
+HOJA_TOTAL_RESULTS = "Total Results"
 
 
 # =============================================================================
 # MAPEO DE CELDAS — FASE DE GRUPOS
-# Confirmado con las capturas del Excel real.
-# Cada grupo tiene 6 partidos. Las filas están separadas por una fila de
-# encabezado entre cada grupo.
 #
 # Columnas (índice 0):
 #   A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7
@@ -57,165 +62,180 @@ HOJA_FINAL = "Quarter, Semis & Final"
 #   Col 7 (H) = Equipo Visitante
 # =============================================================================
 
-# Filas donde empiezan los partidos de cada grupo (índice 0 = fila 1 del Excel)
-# Grupo A: partidos en filas Excel 3-8 → índice 2-7
-# Grupo B: partidos en filas Excel 12-17 → índice 11-16
-# etc.
 GRUPOS_FILAS = {
-    "A": [2, 3, 4, 5, 6, 7],       # GA1-GA6 (filas Excel 3-8)
-    "B": [11, 12, 13, 14, 15, 16],  # GB1-GB6 (filas Excel 12-17)
-    "C": [20, 21, 22, 23, 24, 25],  # GC1-GC6 (filas Excel 21-26)
-    "D": [29, 30, 31, 32, 33, 34],  # GD1-GD6 (filas Excel 30-35)
-    "E": [38, 39, 40, 41, 42, 43],  # GE1-GE6 (filas Excel 39-44)
-    "F": [47, 48, 49, 50, 51, 52],  # GF1-GF6 (filas Excel 48-53)
-    "G": [56, 57, 58, 59, 60, 61],  # GG1-GG6 (filas Excel 57-62)
-    "H": [65, 66, 67, 68, 69, 70],  # GH1-GH6 (filas Excel 66-71)
-    "I": [74, 75, 76, 77, 78, 79],  # GI1-GI6 (filas Excel 75-80)
-    "J": [83, 84, 85, 86, 87, 88],  # GJ1-GJ6 (filas Excel 84-89)
-    "K": [92, 93, 94, 95, 96, 97],  # GK1-GK6 (filas Excel 93-98)
-    "L": [101, 102, 103, 104, 105, 106],  # GL1-GL6 (filas Excel 102-107)
+    "A": [2, 3, 4, 5, 6, 7],
+    "B": [11, 12, 13, 14, 15, 16],
+    "C": [20, 21, 22, 23, 24, 25],
+    "D": [29, 30, 31, 32, 33, 34],
+    "E": [38, 39, 40, 41, 42, 43],
+    "F": [47, 48, 49, 50, 51, 52],
+    "G": [56, 57, 58, 59, 60, 61],
+    "H": [65, 66, 67, 68, 69, 70],
+    "I": [74, 75, 76, 77, 78, 79],
+    "J": [83, 84, 85, 86, 87, 88],
+    "K": [92, 93, 94, 95, 96, 97],
+    "L": [101, 102, 103, 104, 105, 106],
 }
 
-# Columnas para fase de grupos (índice 0)
 COL_GRUPOS = {
-    "id": 0,        # A - ID del partido
-    "fecha": 1,     # B - Fecha
-    "local": 4,     # E - Equipo local
-    "goles_l": 5,   # F - Goles local (APUESTA)
-    "goles_v": 6,   # G - Goles visitante (APUESTA)
-    "visitante": 7,  # H - Equipo visitante
+    "id": 0,         # A
+    "fecha": 1,      # B
+    "local": 4,      # E
+    "goles_l": 5,    # F (apuesta)
+    "goles_v": 6,    # G (apuesta)
+    "visitante": 7,  # H
 }
 
 
 # =============================================================================
-# MAPEO DE CELDAS — ROUND OF 32 (16vos de Final)
+# MAPEO DE CELDAS — ELIMINATORIAS
 #
-# Lado izquierdo (M73-M80):
-#   Col A=0 → Código, Col B=1 → Equipo1, Col C=2 → Goles1, Col D=3 → Goles2, Col E=4 → Equipo2
-#   Penales en fila+1: Col B=1 → "Penales", Col C=2 → Pen1, Col D=3 → Pen2
+# Round of 32 (16vos) - Pestaña "Round of 32 & Round of 16"
+#   Izquierda (M73-M80): B=equipo1, C=goles1, D=goles2, E=equipo2
+#   Derecha (M81-M88): H=equipo1, I=goles1, J=goles2, K=equipo2
+#   Penales en fila+1: mismas columnas de goles
 #
-# Lado derecho (M81-M88):
-#   Col G=6 → Código, Col H=7 → Equipo1, Col I=8 → Goles1, Col J=9 → Goles2, Col K=10 → Equipo2
-#   Penales en fila+1: Col H=7 → "Penales", Col I=8 → Pen1, Col J=9 → Pen2
+# Round of 16 (8vos) - misma pestaña
+#   Izquierda (M89-M92): P=equipo1, Q=goles1, R=goles2, S=equipo2
+#   Derecha (M93-M96): V=equipo1, W=goles1, X=goles2, Y=equipo2
+#
+# Quarter, Semis & Final - Pestaña "Quarter, Semis & Final"
+#   Cuartos izq (M97-M98): B=eq1, C=g1, D=g2, E=eq2
+#   Cuartos der (M99-M100): H=eq1, I=g1, J=g2, K=eq2
+#   Semis (M101): B=eq1, C=g1, D=g2, E=eq2
+#   Semis (M102): H=eq1, I=g1, J=g2, K=eq2
+#   3er puesto (M103): O=eq1, P=g1, Q=g2, R=eq2
+#   Final (M104): O=eq1, P=g1, Q=g2, R=eq2
 # =============================================================================
 
-# Fila Excel → índice 0 (restar 1)
+# Cada entrada: (fila_idx, col_eq1, col_g1, col_g2, col_eq2)
 ROUND32_IZQUIERDA = {
-    # partido: (fila_idx, col_codigo, col_eq1, col_g1, col_g2, col_eq2)
-    "M73": (4, 0, 1, 2, 3, 4),
-    "M74": (8, 0, 1, 2, 3, 4),
-    "M75": (12, 0, 1, 2, 3, 4),
-    "M76": (16, 0, 1, 2, 3, 4),
-    "M77": (20, 0, 1, 2, 3, 4),
-    "M78": (24, 0, 1, 2, 3, 4),
-    "M79": (28, 0, 1, 2, 3, 4),
-    "M80": (32, 0, 1, 2, 3, 4),
+    "M73": (4, 1, 2, 3, 4),
+    "M74": (8, 1, 2, 3, 4),
+    "M75": (12, 1, 2, 3, 4),
+    "M76": (16, 1, 2, 3, 4),
+    "M77": (20, 1, 2, 3, 4),
+    "M78": (24, 1, 2, 3, 4),
+    "M79": (28, 1, 2, 3, 4),
+    "M80": (32, 1, 2, 3, 4),
 }
 
 ROUND32_DERECHA = {
-    "M81": (4, 6, 7, 8, 9, 10),
-    "M82": (8, 6, 7, 8, 9, 10),
-    "M83": (12, 6, 7, 8, 9, 10),
-    "M84": (16, 6, 7, 8, 9, 10),
-    "M85": (20, 6, 7, 8, 9, 10),
-    "M86": (24, 6, 7, 8, 9, 10),
-    "M87": (28, 6, 7, 8, 9, 10),
-    "M88": (32, 6, 7, 8, 9, 10),
+    "M81": (4, 7, 8, 9, 10),
+    "M82": (8, 7, 8, 9, 10),
+    "M83": (12, 7, 8, 9, 10),
+    "M84": (16, 7, 8, 9, 10),
+    "M85": (20, 7, 8, 9, 10),
+    "M86": (24, 7, 8, 9, 10),
+    "M87": (28, 7, 8, 9, 10),
+    "M88": (32, 7, 8, 9, 10),
 }
 
-
-# =============================================================================
-# MAPEO DE CELDAS — ROUND OF 16 (8vos de Final)
-#
-# Lado izquierdo (M89-M92):
-#   Col N=13 → Código, Col P=15 → Equipo1, Col Q=16 → Goles1,
-#   Col R=17 → Goles2, Col S=18 → Equipo2
-#
-# Lado derecho (M93-M96):
-#   Col T=19 → Código, Col V=21 → Equipo1, Col W=22 → Goles1,
-#   Col X=23 → Goles2, Col Y=24 → Equipo2
-# =============================================================================
-
 ROUND16_IZQUIERDA = {
-    "M89": (4, 13, 15, 16, 17, 18),
-    "M90": (12, 13, 15, 16, 17, 18),
-    "M91": (20, 13, 15, 16, 17, 18),
-    "M92": (28, 13, 15, 16, 17, 18),
+    "M89": (4, 15, 16, 17, 18),
+    "M90": (12, 15, 16, 17, 18),
+    "M91": (20, 15, 16, 17, 18),
+    "M92": (28, 15, 16, 17, 18),
 }
 
 ROUND16_DERECHA = {
-    "M93": (4, 19, 21, 22, 23, 24),
-    "M94": (12, 19, 21, 22, 23, 24),
-    "M95": (20, 19, 21, 22, 23, 24),
-    "M96": (28, 19, 21, 22, 23, 24),
+    "M93": (4, 21, 22, 23, 24),
+    "M94": (12, 21, 22, 23, 24),
+    "M95": (20, 21, 22, 23, 24),
+    "M96": (28, 21, 22, 23, 24),
 }
 
-
-# =============================================================================
-# MAPEO DE CELDAS — QUARTER FINALS, SEMIS & FINAL
-#
-# Cuartos izquierda (M97-M98):
-#   B=1→Equipo1, C=2→Goles1, D=3→Goles2, E=4→Equipo2
-#
-# Cuartos derecha (M99-M100):
-#   H=7→Equipo1, I=8→Goles1, J=9→Goles2, K=10→Equipo2
-#
-# Semis (M101-M102): misma estructura que cuartos
-#
-# 3er puesto (M103):
-#   O=14→Equipo1, P=15→Goles1, Q=16→Goles2, R=17→Equipo2
-#
-# Final (M104):
-#   O=14→Equipo1, P=15→Goles1, Q=16→Goles2, R=17→Equipo2
-#
-# Categorías especiales:
-#   Etiqueta en col N=13, Valor en col O=14
-# =============================================================================
-
 CUARTOS_IZQUIERDA = {
-    "M97": (4, 0, 1, 2, 3, 4),
-    "M98": (8, 0, 1, 2, 3, 4),
+    "M97": (4, 1, 2, 3, 4),
+    "M98": (8, 1, 2, 3, 4),
 }
 
 CUARTOS_DERECHA = {
-    "M99": (4, 6, 7, 8, 9, 10),
-    "M100": (8, 6, 7, 8, 9, 10),
+    "M99": (4, 7, 8, 9, 10),
+    "M100": (8, 7, 8, 9, 10),
 }
 
 SEMIS = {
-    "M101": (18, 0, 1, 2, 3, 4),   # Fila Excel 19 → índice 18
-    "M102": (18, 6, 7, 8, 9, 10),   # Fila Excel 19 → índice 18
+    "M101": (18, 1, 2, 3, 4),
+    "M102": (18, 7, 8, 9, 10),
 }
 
 TERCER_PUESTO = {
-    "M103": (13, 13, 14, 15, 16, 17),  # Fila Excel 14 → índice 13
+    "M103": (13, 14, 15, 16, 17),
 }
 
 FINAL = {
-    "M104": (4, 13, 14, 15, 16, 17),  # Fila Excel 5 → índice 4
+    "M104": (4, 14, 15, 16, 17),
 }
 
 # Categorías especiales — Pestaña "Quarter, Semis & Final"
-# Fila Excel → índice 0
 CATEGORIAS_CELDAS = {
-    "Figura": (20, 14),           # Fila 21, col O (índice 14)
-    "Goleador": (21, 14),         # Fila 22, col O
-    "Revelación": (22, 14),       # Fila 23, col O
-    "Decepción": (23, 14),        # Fila 24, col O
-    "Mejor 1era Fase": (24, 14),  # Fila 25, col O
-    "Peor Equipo": (25, 14),      # Fila 26, col O
+    "Figura": (20, 14),
+    "Goleador": (21, 14),
+    "Revelación": (22, 14),
+    "Decepción": (23, 14),
+    "Mejor 1era Fase": (24, 14),
+    "Peor Equipo": (25, 14),
 }
 
 
 # =============================================================================
-# FUNCIONES DE LECTURA
+# MAPEO DE CELDAS — TOTAL RESULTS
+#
+# La pestaña "Total Results" tiene 48 filas (una por equipo) + 1 encabezado.
+# Fila 0 (índice) = Encabezado: Fase, Pts*, País, Puntos, G, E, P, Dif, G+, G-
+# Filas 1-48 (índice) = Datos de cada equipo
+#
+# Columnas (índice 0):
+#   A=0 → Número de posición
+#   B=1 → Fase alcanzada (Campeón, Sub-campeón, 3er puesto, Semifinal,
+#          4tos de final, 8vos de final, 16vos de final, Groups stage)
+#   D=3 → País
+#   E=4 → Puntos
+#   F=5 → Ganados
+#   G=6 → Empates
+#   H=7 → Perdidos
+#   I=8 → Diferencia de goles
+#   J=9 → Goles a favor (G+)
+#   K=10 → Goles en contra (G-)
 # =============================================================================
 
-def _leer_celda(df: pd.DataFrame, fila: int, col: int) -> Optional[str]:
-    """
-    Lee una celda del DataFrame de forma segura.
-    Retorna None si está fuera de rango o es NaN.
-    """
+COL_TR = {
+    "posicion": 0,   # A
+    "fase": 1,       # B
+    "pais": 3,       # D
+    "puntos": 4,     # E
+    "ganados": 5,    # F
+    "empates": 6,    # G
+    "perdidos": 7,   # H
+    "dif": 8,        # I
+    "goles_favor": 9,   # J
+    "goles_contra": 10,  # K
+}
+
+# Mapeo de nombres de fases en "Total Results" a nombres internos
+FASE_MAPEO = {
+    "campeón": "campeon",
+    "campeon": "campeon",
+    "sub-campeón": "subcampeon",
+    "sub-campeon": "subcampeon",
+    "subcampeón": "subcampeon",
+    "subcampeon": "subcampeon",
+    "3er puesto": "3ero",
+    "semifinal": "semis",
+    "4tos de final": "4tos",
+    "8vos de final": "8vos",
+    "16vos de final": "16vos",
+    "groups stage": "grupos",
+}
+
+
+# =============================================================================
+# FUNCIONES AUXILIARES DE LECTURA
+# =============================================================================
+
+def _leer_celda(df: pd.DataFrame, fila: int, col: int):
+    """Lee una celda de forma segura. Retorna None si está fuera de rango o NaN."""
     try:
         valor = df.iloc[fila, col]
         if pd.isna(valor):
@@ -226,10 +246,7 @@ def _leer_celda(df: pd.DataFrame, fila: int, col: int) -> Optional[str]:
 
 
 def _leer_celda_num(df: pd.DataFrame, fila: int, col: int) -> Optional[int]:
-    """
-    Lee una celda numérica (goles) del DataFrame.
-    Retorna None si no es un número válido.
-    """
+    """Lee una celda numérica (goles). Retorna None si no es número."""
     valor = _leer_celda(df, fila, col)
     if valor is None:
         return None
@@ -240,9 +257,7 @@ def _leer_celda_num(df: pd.DataFrame, fila: int, col: int) -> Optional[int]:
 
 
 def _leer_celda_str(df: pd.DataFrame, fila: int, col: int) -> str:
-    """
-    Lee una celda como string. Retorna "" si está vacía.
-    """
+    """Lee una celda como string. Retorna "" si está vacía."""
     valor = _leer_celda(df, fila, col)
     if valor is None:
         return ""
@@ -253,15 +268,13 @@ def _determinar_ganador(g1: int, g2: int, pen1: Optional[int], pen2: Optional[in
     """
     Determina quién gana un partido de eliminatoria.
     Si hay empate en tiempo regular, se revisan los penales.
-    
-    Retorna: 'equipo1', 'equipo2', o 'empate' (solo en grupos)
+    Retorna: 'equipo1', 'equipo2', o 'empate'
     """
     if g1 > g2:
         return "equipo1"
     elif g2 > g1:
         return "equipo2"
     else:
-        # Empate en tiempo regular → revisar penales
         if pen1 is not None and pen2 is not None:
             if pen1 > pen2:
                 return "equipo1"
@@ -271,19 +284,161 @@ def _determinar_ganador(g1: int, g2: int, pen1: Optional[int], pen2: Optional[in
 
 
 # =============================================================================
+# PARSEO DE TOTAL RESULTS (NUEVA FUNCIÓN CLAVE)
+# =============================================================================
+
+def parsear_total_results(df: pd.DataFrame, participante: str) -> Dict:
+    """
+    Lee la pestaña "Total Results" y extrae la clasificación completa
+    del torneo según las predicciones del participante.
+    
+    Esta pestaña es generada automáticamente por las fórmulas del Excel
+    y nos da directamente qué equipos llegaron a cada fase [1].
+    
+    Retorna un diccionario con:
+    - "campeon": str (nombre del equipo campeón)
+    - "subcampeon": str
+    - "tercero": str (3er puesto)
+    - "equipos_por_ronda": Dict[str, set] → {ronda: set(equipos)}
+      Cada equipo aparece en la ronda MÁS LEJANA que alcanzó.
+      Pero para el cálculo de puntos, un equipo que llegó a semis
+      también "llegó" a 4tos, 8vos y 16vos.
+    - "tabla_completa": pd.DataFrame con toda la tabla
+    - "equipos_grupos_eliminados": set → equipos que NO pasaron de grupos
+    """
+    resultado = {
+        "campeon": "",
+        "subcampeon": "",
+        "tercero": "",
+        "cuarto": "",  # Semifinalista perdedor que no es 3ero
+        "equipos_por_fase": {},  # Fase exacta alcanzada
+        "equipos_por_ronda": {},  # Acumulado (para cálculo de puntos)
+        "equipos_grupos_eliminados": set(),
+        "tabla_completa": pd.DataFrame(),
+        "participante": participante,
+    }
+    
+    # Leer todas las filas de la tabla (empezando desde fila 1, la 0 es encabezado)
+    filas_datos = []
+    
+    for fila_idx in range(1, min(len(df), 50)):  # Máximo 48 equipos + margen
+        fase_raw = _leer_celda_str(df, fila_idx, COL_TR["fase"])
+        pais = _leer_celda_str(df, fila_idx, COL_TR["pais"])
+        puntos = _leer_celda_num(df, fila_idx, COL_TR["puntos"])
+        ganados = _leer_celda_num(df, fila_idx, COL_TR["ganados"])
+        empates = _leer_celda_num(df, fila_idx, COL_TR["empates"])
+        perdidos = _leer_celda_num(df, fila_idx, COL_TR["perdidos"])
+        dif = _leer_celda_num(df, fila_idx, COL_TR["dif"])
+        gf = _leer_celda_num(df, fila_idx, COL_TR["goles_favor"])
+        gc = _leer_celda_num(df, fila_idx, COL_TR["goles_contra"])
+        
+        if not pais or not fase_raw:
+            continue
+        
+        # Normalizar el nombre de la fase
+        fase_normalizada = FASE_MAPEO.get(fase_raw.lower().strip(), "desconocida")
+        
+        filas_datos.append({
+            "posicion": fila_idx,
+            "fase_raw": fase_raw,
+            "fase": fase_normalizada,
+            "pais": pais,
+            "puntos": puntos or 0,
+            "ganados": ganados or 0,
+            "empates": empates or 0,
+            "perdidos": perdidos or 0,
+            "dif": dif or 0,
+            "goles_favor": gf or 0,
+            "goles_contra": gc or 0,
+        })
+    
+    if not filas_datos:
+        return resultado
+    
+    tabla = pd.DataFrame(filas_datos)
+    resultado["tabla_completa"] = tabla
+    
+    # --- Extraer equipos clave ---
+    campeon_rows = tabla[tabla["fase"] == "campeon"]
+    if not campeon_rows.empty:
+        resultado["campeon"] = campeon_rows.iloc[0]["pais"]
+    
+    subcampeon_rows = tabla[tabla["fase"] == "subcampeon"]
+    if not subcampeon_rows.empty:
+        resultado["subcampeon"] = subcampeon_rows.iloc[0]["pais"]
+    
+    tercero_rows = tabla[tabla["fase"] == "3ero"]
+    if not tercero_rows.empty:
+        resultado["tercero"] = tercero_rows.iloc[0]["pais"]
+    
+    cuarto_rows = tabla[tabla["fase"] == "semis"]
+    if not cuarto_rows.empty:
+        resultado["cuarto"] = cuarto_rows.iloc[0]["pais"]
+    
+    # --- Equipos por fase exacta ---
+    equipos_por_fase = {}
+    for _, row in tabla.iterrows():
+        fase = row["fase"]
+        if fase not in equipos_por_fase:
+            equipos_por_fase[fase] = set()
+        equipos_por_fase[fase].add(row["pais"])
+    resultado["equipos_por_fase"] = equipos_por_fase
+    
+    # --- Equipos eliminados en grupos ---
+    resultado["equipos_grupos_eliminados"] = equipos_por_fase.get("grupos", set())
+    
+    # --- Equipos por ronda ACUMULADO ---
+    # Un equipo que llegó a semis también "estuvo" en 4tos, 8vos y 16vos.
+    # Esto es lo que necesitamos para calcular puntos de eliminatorias:
+    # si predijiste que Brasil llega a 8vos y realmente llegó a semis,
+    # igualmente sumás los puntos de 8vos.
+    
+    # Jerarquía de fases (de más lejos a más cerca)
+    jerarquia = ["campeon", "subcampeon", "3ero", "semis", "4tos", "8vos", "16vos"]
+    
+    equipos_por_ronda = {
+        "16vos": set(),
+        "8vos": set(),
+        "4tos": set(),
+        "semis": set(),
+        "final": set(),  # Campeón + subcampeón
+    }
+    
+    for _, row in tabla.iterrows():
+        fase = row["fase"]
+        pais = row["pais"]
+        
+        if fase == "grupos":
+            continue  # No pasó de grupos, no suma en ninguna ronda
+        
+        # El equipo llegó al menos a 16vos
+        equipos_por_ronda["16vos"].add(pais)
+        
+        if fase in ["8vos", "4tos", "semis", "3ero", "campeon", "subcampeon"]:
+            equipos_por_ronda["8vos"].add(pais)
+        
+        if fase in ["4tos", "semis", "3ero", "campeon", "subcampeon"]:
+            equipos_por_ronda["4tos"].add(pais)
+        
+        if fase in ["semis", "3ero", "campeon", "subcampeon"]:
+            equipos_por_ronda["semis"].add(pais)
+        
+        if fase in ["campeon", "subcampeon"]:
+            equipos_por_ronda["final"].add(pais)
+    
+    resultado["equipos_por_ronda"] = equipos_por_ronda
+    
+    return resultado
+
+
+# =============================================================================
 # PARSEO DE FASE DE GRUPOS
 # =============================================================================
 
 def parsear_grupos(df: pd.DataFrame, participante: str) -> pd.DataFrame:
     """
     Extrae las 72 apuestas de fase de grupos de un participante.
-    
-    Lee la pestaña "Groups Stage" usando las coordenadas exactas confirmadas
-    con las capturas del Excel real.
-    
-    Retorna un DataFrame con columnas:
-    - partido_id, grupo, fecha, equipo_local, equipo_visitante,
-      goles_local_pred, goles_visitante_pred, participante
+    Lee la pestaña "Groups Stage" usando coordenadas exactas.
     """
     apuestas = []
     
@@ -296,7 +451,6 @@ def parsear_grupos(df: pd.DataFrame, participante: str) -> pd.DataFrame:
             goles_v = _leer_celda_num(df, fila_idx, COL_GRUPOS["goles_v"])
             visitante = _leer_celda_str(df, fila_idx, COL_GRUPOS["visitante"])
             
-            # Generar ID si no se lee correctamente
             if not partido_id:
                 partido_id = f"G{grupo}{i+1}"
             
@@ -316,7 +470,7 @@ def parsear_grupos(df: pd.DataFrame, participante: str) -> pd.DataFrame:
 
 
 # =============================================================================
-# PARSEO DE ELIMINATORIAS
+# PARSEO DE ELIMINATORIAS (partidos individuales con goles y penales)
 # =============================================================================
 
 def _parsear_bloque_eliminatoria(
@@ -327,43 +481,31 @@ def _parsear_bloque_eliminatoria(
 ) -> List[dict]:
     """
     Parsea un bloque de partidos de eliminatoria.
-    
-    Para cada partido:
-    1. Lee equipos y goles de la fila principal
-    2. Si hay empate (goles iguales), lee la fila siguiente para penales
-    3. Determina el ganador
-    
-    Parámetros:
-        df: DataFrame de la pestaña correspondiente
-        mapeo: Dict con {código_partido: (fila, col_cod, col_eq1, col_g1, col_g2, col_eq2)}
-        ronda: Nombre de la ronda ("16vos", "8vos", "4tos", "semis", "3ero", "final")
-        participante: Nombre del participante
+    Lee equipos, goles, y penales (si hay empate en la fila siguiente).
     """
     partidos = []
     
-    for codigo, (fila, col_cod, col_eq1, col_g1, col_g2, col_eq2) in mapeo.items():
+    for codigo, (fila, col_eq1, col_g1, col_g2, col_eq2) in mapeo.items():
         equipo1 = _leer_celda_str(df, fila, col_eq1)
         goles1 = _leer_celda_num(df, fila, col_g1)
         goles2 = _leer_celda_num(df, fila, col_g2)
         equipo2 = _leer_celda_str(df, fila, col_eq2)
         
-        # Revisar si hay penales (fila siguiente, mismas columnas de goles)
+        # Revisar penales en la fila siguiente
         penales1 = None
         penales2 = None
-        
-        # Verificar si la fila siguiente tiene "Penales" en la columna del equipo1
-        texto_penales = _leer_celda_str(df, fila + 1, col_eq1)
-        if "penal" in texto_penales.lower():
+        texto_pen = _leer_celda_str(df, fila + 1, col_eq1)
+        if "penal" in texto_pen.lower():
             penales1 = _leer_celda_num(df, fila + 1, col_g1)
             penales2 = _leer_celda_num(df, fila + 1, col_g2)
         
         # Determinar ganador
         ganador = ""
         if goles1 is not None and goles2 is not None:
-            resultado = _determinar_ganador(goles1, goles2, penales1, penales2)
-            if resultado == "equipo1":
+            res = _determinar_ganador(goles1, goles2, penales1, penales2)
+            if res == "equipo1":
                 ganador = equipo1
-            elif resultado == "equipo2":
+            elif res == "equipo2":
                 ganador = equipo2
         
         partidos.append({
@@ -388,65 +530,24 @@ def parsear_eliminatorias(
     participante: str
 ) -> pd.DataFrame:
     """
-    Extrae TODAS las predicciones de eliminatorias de un participante.
-    
-    Lee las pestañas "Round of 32 & Round of 16" y "Quarter, Semis & Final"
-    usando las coordenadas exactas mapeadas.
-    
-    Retorna un DataFrame con todos los partidos M73 a M104.
+    Extrae TODAS las predicciones de eliminatorias (M73 a M104).
     """
-    todos_partidos = []
+    todos = []
     
-    # --- Pestaña "Round of 32 & Round of 16" ---
+    # Pestaña "Round of 32 & Round of 16"
+    todos.extend(_parsear_bloque_eliminatoria(df_elim, ROUND32_IZQUIERDA, "16vos", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_elim, ROUND32_DERECHA, "16vos", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_elim, ROUND16_IZQUIERDA, "8vos", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_elim, ROUND16_DERECHA, "8vos", participante))
     
-    # 16vos de final izquierda (M73-M80)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_elim, ROUND32_IZQUIERDA, "16vos", participante)
-    )
+    # Pestaña "Quarter, Semis & Final"
+    todos.extend(_parsear_bloque_eliminatoria(df_final, CUARTOS_IZQUIERDA, "4tos", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_final, CUARTOS_DERECHA, "4tos", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_final, SEMIS, "semis", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_final, TERCER_PUESTO, "3ero", participante))
+    todos.extend(_parsear_bloque_eliminatoria(df_final, FINAL, "final", participante))
     
-    # 16vos de final derecha (M81-M88)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_elim, ROUND32_DERECHA, "16vos", participante)
-    )
-    
-    # 8vos de final izquierda (M89-M92)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_elim, ROUND16_IZQUIERDA, "8vos", participante)
-    )
-    
-    # 8vos de final derecha (M93-M96)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_elim, ROUND16_DERECHA, "8vos", participante)
-    )
-    
-    # --- Pestaña "Quarter, Semis & Final" ---
-    
-    # Cuartos izquierda (M97-M98)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_final, CUARTOS_IZQUIERDA, "4tos", participante)
-    )
-    
-    # Cuartos derecha (M99-M100)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_final, CUARTOS_DERECHA, "4tos", participante)
-    )
-    
-    # Semifinales (M101-M102)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_final, SEMIS, "semis", participante)
-    )
-    
-    # 3er puesto (M103)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_final, TERCER_PUESTO, "3ero", participante)
-    )
-    
-    # Final (M104)
-    todos_partidos.extend(
-        _parsear_bloque_eliminatoria(df_final, FINAL, "final", participante)
-    )
-    
-    return pd.DataFrame(todos_partidos)
+    return pd.DataFrame(todos)
 
 
 # =============================================================================
@@ -458,19 +559,12 @@ def parsear_categorias_especiales(
     participante: str
 ) -> Dict[str, str]:
     """
-    Extrae las categorías especiales de la pestaña "Quarter, Semis & Final".
-    
-    Lee las celdas exactas donde están Figura, Goleador, Revelación,
-    Decepción, Mejor 1era Fase y Peor Equipo.
-    
-    Retorna un diccionario {categoría: valor_predicho}
+    Extrae las categorías especiales de la pestaña "Quarter, Semis & Final":
+    Figura, Goleador, Revelación, Decepción, Mejor 1era Fase, Peor Equipo.
     """
     categorias = {}
-    
     for nombre_cat, (fila, col) in CATEGORIAS_CELDAS.items():
-        valor = _leer_celda_str(df_final, fila, col)
-        categorias[nombre_cat] = valor
-    
+        categorias[nombre_cat] = _leer_celda_str(df_final, fila, col)
     return categorias
 
 
@@ -481,84 +575,83 @@ def parsear_categorias_especiales(
 @st.cache_data
 def cargar_todos_los_participantes(
     directorio: str = DEFAULT_PARTICIPANTES_DIR
-) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Dict[str, str]]]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Dict[str, str]], Dict[str, Dict]]:
     """
-    Función principal que carga y procesa TODOS los archivos Excel
-    de la carpeta de participantes.
+    Función principal que carga y procesa TODOS los archivos Excel.
     
-    Busca todos los archivos .xlsm en el directorio especificado.
-    El nombre del archivo (sin extensión) se usa como nombre del participante.
+    Busca todos los .xlsm / .xlsx en la carpeta de participantes.
+    El nombre del archivo (sin extensión) = nombre del participante.
     
     Retorna una tupla con:
-    1. DataFrame con TODAS las apuestas de fase de grupos de TODOS los participantes
-    2. DataFrame con TODAS las predicciones de eliminatorias de TODOS los participantes
-    3. Diccionario {participante: {categoría: valor}} con categorías especiales
+    1. DataFrame con TODAS las apuestas de fase de grupos
+    2. DataFrame con TODAS las predicciones de eliminatorias
+    3. Dict {participante: {categoría: valor}} → categorías especiales
+    4. Dict {participante: {...}} → datos de Total Results
+       Incluye: campeon, subcampeon, tercero, equipos_por_ronda,
+       equipos_por_fase, equipos_grupos_eliminados, tabla_completa
     """
-    # Buscar todos los archivos .xlsm en la carpeta
-    patron = os.path.join(directorio, "*.xlsm")
-    archivos = glob.glob(patron)
-    
-    # También buscar .xlsx por si alguien convierte el formato
-    patron_xlsx = os.path.join(directorio, "*.xlsx")
-    archivos.extend(glob.glob(patron_xlsx))
+    # Buscar archivos
+    archivos = []
+    if os.path.exists(directorio):
+        for ext in ["*.xlsm", "*.xlsx"]:
+            archivos.extend(glob.glob(os.path.join(directorio, ext)))
     
     if not archivos:
         st.warning(
             f"⚠️ No se encontraron archivos Excel en `{directorio}/`. "
             f"Colocá los archivos .xlsm de cada participante ahí."
         )
-        return pd.DataFrame(), pd.DataFrame(), {}
+        return pd.DataFrame(), pd.DataFrame(), {}, {}
     
     st.info(f"📂 Se encontraron {len(archivos)} archivos de participantes.")
     
     todas_apuestas_grupos = []
-    todas_predicciones_elim = []
+    todas_pred_elim = []
     todas_categorias = {}
+    todos_total_results = {}
     
     for archivo in sorted(archivos):
-        # Extraer nombre del participante del nombre del archivo
         nombre_archivo = os.path.basename(archivo)
         participante = os.path.splitext(nombre_archivo)[0]
         
         try:
-            # Leer las 3 pestañas del Excel
             xls = pd.ExcelFile(archivo, engine="openpyxl")
+            hojas = xls.sheet_names
             
-            # Verificar que las pestañas existen
-            hojas_disponibles = xls.sheet_names
-            
-            if HOJA_GRUPOS not in hojas_disponibles:
-                st.error(f"❌ {participante}: No tiene la pestaña '{HOJA_GRUPOS}'")
-                continue
-            if HOJA_ELIMINATORIAS not in hojas_disponibles:
-                st.error(f"❌ {participante}: No tiene la pestaña '{HOJA_ELIMINATORIAS}'")
-                continue
-            if HOJA_FINAL not in hojas_disponibles:
-                st.error(f"❌ {participante}: No tiene la pestaña '{HOJA_FINAL}'")
+            # Verificar que todas las pestañas existen
+            pestanas_requeridas = [HOJA_GRUPOS, HOJA_ELIMINATORIAS, HOJA_FINAL, HOJA_TOTAL_RESULTS]
+            faltantes = [h for h in pestanas_requeridas if h not in hojas]
+            if faltantes:
+                st.error(f"❌ {participante}: Faltan pestañas: {', '.join(faltantes)}")
                 continue
             
-            # Leer cada pestaña sin encabezado (header=None) para usar índices
+            # Leer cada pestaña sin encabezado
             df_grupos = pd.read_excel(xls, sheet_name=HOJA_GRUPOS, header=None)
             df_elim = pd.read_excel(xls, sheet_name=HOJA_ELIMINATORIAS, header=None)
             df_final = pd.read_excel(xls, sheet_name=HOJA_FINAL, header=None)
+            df_total = pd.read_excel(xls, sheet_name=HOJA_TOTAL_RESULTS, header=None)
             
-            # --- Parsear fase de grupos ---
+            # --- 1. Parsear fase de grupos ---
             apuestas_grupos = parsear_grupos(df_grupos, participante)
             todas_apuestas_grupos.append(apuestas_grupos)
             
-            # --- Parsear eliminatorias ---
+            # --- 2. Parsear eliminatorias (partidos individuales) ---
             pred_elim = parsear_eliminatorias(df_elim, df_final, participante)
-            todas_predicciones_elim.append(pred_elim)
+            todas_pred_elim.append(pred_elim)
             
-            # --- Parsear categorías especiales ---
+            # --- 3. Parsear categorías especiales ---
             categorias = parsear_categorias_especiales(df_final, participante)
-            todas_categorias[participante] = categorias
             
-            # Extraer campeón predicho (ganador de M104)
-            final_pred = pred_elim[pred_elim["partido_id"] == "M104"]
-            if not final_pred.empty:
-                campeon = final_pred.iloc[0]["ganador_pred"]
-                todas_categorias[participante]["Campeon"] = campeon
+            # --- 4. Parsear Total Results (CLAVE) ---
+            total_results = parsear_total_results(df_total, participante)
+            todos_total_results[participante] = total_results
+            
+            # Agregar campeón a las categorías para cálculo de penalidades
+            categorias["Campeon"] = total_results.get("campeon", "")
+            categorias["Subcampeon"] = total_results.get("subcampeon", "")
+            categorias["Tercero"] = total_results.get("tercero", "")
+            
+            todas_categorias[participante] = categorias
             
             st.success(f"✅ {participante}: cargado correctamente")
             
@@ -566,47 +659,36 @@ def cargar_todos_los_participantes(
             st.error(f"❌ Error leyendo archivo de {participante}: {e}")
             continue
     
-    # Concatenar todos los DataFrames
+    # Concatenar DataFrames
     df_grupos_total = (
-        pd.concat(todas_apuestas_grupos, ignore_index=True) 
+        pd.concat(todas_apuestas_grupos, ignore_index=True)
         if todas_apuestas_grupos else pd.DataFrame()
     )
     df_elim_total = (
-        pd.concat(todas_predicciones_elim, ignore_index=True) 
-        if todas_predicciones_elim else pd.DataFrame()
+        pd.concat(todas_pred_elim, ignore_index=True)
+        if todas_pred_elim else pd.DataFrame()
     )
     
-    return df_grupos_total, df_elim_total, todas_categorias
+    return df_grupos_total, df_elim_total, todas_categorias, todos_total_results
 
 
 def obtener_equipos_predichos_por_ronda(
-    df_elim: pd.DataFrame,
-    participante: str
-) -> Dict[str, set]:
+    total_results: Dict
+) -> Dict[str, Set[str]]:
     """
-    Extrae los equipos que un participante predice en cada ronda.
+    Extrae los equipos que un participante predice en cada ronda,
+    directamente desde la pestaña Total Results.
     
-    Esto es clave para el cálculo de puntos: se otorgan puntos por cada
-    equipo que el participante predijo correctamente que avanzaría a esa ronda.
+    Esto reemplaza la lógica anterior de deducir ronda por ronda
+    desde los partidos individuales. Total Results ya tiene todo
+    calculado por las fórmulas del Excel [1].
     
     Retorna: Dict {ronda: set(equipos)}
     """
-    pred = df_elim[df_elim["participante"] == participante]
-    
-    equipos_por_ronda = {}
-    
-    for ronda in ["16vos", "8vos", "4tos", "semis", "3ero", "final"]:
-        partidos_ronda = pred[pred["ronda"] == ronda]
-        equipos = set()
-        
-        for _, partido in partidos_ronda.iterrows():
-            eq1 = partido.get("equipo1", "")
-            eq2 = partido.get("equipo2", "")
-            if eq1:
-                equipos.add(eq1)
-            if eq2:
-                equipos.add(eq2)
-        
-        equipos_por_ronda[ronda] = equipos
-    
-    return equipos_por_ronda
+    return total_results.get("equipos_por_ronda", {
+        "16vos": set(),
+        "8vos": set(),
+        "4tos": set(),
+        "semis": set(),
+        "final": set(),
+    })
