@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 st.set_page_config(
-    page_title="⚽ PRODE Mundial 2026",
+    page_title="⚽ Panel Principal - PRODE Mundial 2026",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -22,6 +22,11 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Configuración")
         usar_sim = st.toggle("🎮 Simulación", value=st.session_state.get("usar_simulacion", True))
+        if usar_sim:
+            fase_sim = st.selectbox("📅 Simular hasta:", 
+                ["todo", "grupos", "16vos", "8vos", "4tos", "semis"],
+                index=0)
+            st.session_state["fase_simulacion"] = fase_sim
         st.session_state["usar_simulacion"] = usar_sim
         if st.button("🔄 Recargar datos"):
             from utils.data_loader import forzar_recarga

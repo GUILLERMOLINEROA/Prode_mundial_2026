@@ -85,7 +85,8 @@ def cargar_todo():
     usar_simulacion = st.session_state.get("usar_simulacion", True)
     if usar_simulacion:
         from utils.simulacion import generar_resultados_simulados
-        resultados = generar_resultados_simulados()
+        fase_sim = st.session_state.get("fase_simulacion", "todo")
+        resultados = generar_resultados_simulados(fase_sim)
     else:
         resultados = obtener_partidos_mundial()
         if not resultados.empty:
