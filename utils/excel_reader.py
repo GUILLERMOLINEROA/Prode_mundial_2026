@@ -35,6 +35,7 @@ import streamlit as st
 import os
 import glob
 from typing import Dict, List, Tuple, Optional, Set
+from utils.normalizar import normalizar_nombre_equipo
 
 
 # --- Ruta por defecto de la carpeta de participantes ---
@@ -323,7 +324,7 @@ def parsear_total_results(df: pd.DataFrame, participante: str) -> Dict:
     
     for fila_idx in range(1, min(len(df), 50)):  # Máximo 48 equipos + margen
         fase_raw = _leer_celda_str(df, fila_idx, COL_TR["fase"])
-        pais = _leer_celda_str(df, fila_idx, COL_TR["pais"])
+        pais = normalizar_nombre_equipo(_leer_celda_str(df, fila_idx, COL_TR["pais"]))
         puntos = _leer_celda_num(df, fila_idx, COL_TR["puntos"])
         ganados = _leer_celda_num(df, fila_idx, COL_TR["ganados"])
         empates = _leer_celda_num(df, fila_idx, COL_TR["empates"])
@@ -446,10 +447,10 @@ def parsear_grupos(df: pd.DataFrame, participante: str) -> pd.DataFrame:
         for i, fila_idx in enumerate(filas):
             partido_id = _leer_celda_str(df, fila_idx, COL_GRUPOS["id"])
             fecha = _leer_celda_str(df, fila_idx, COL_GRUPOS["fecha"])
-            local = _leer_celda_str(df, fila_idx, COL_GRUPOS["local"])
+            local = normalizar_nombre_equipo(_leer_celda_str(df, fila_idx, COL_GRUPOS["local"]))
             goles_l = _leer_celda_num(df, fila_idx, COL_GRUPOS["goles_l"])
             goles_v = _leer_celda_num(df, fila_idx, COL_GRUPOS["goles_v"])
-            visitante = _leer_celda_str(df, fila_idx, COL_GRUPOS["visitante"])
+            visitante = normalizar_nombre_equipo(_leer_celda_str(df, fila_idx, COL_GRUPOS["visitante"]))
             
             if not partido_id:
                 partido_id = f"G{grupo}{i+1}"
@@ -486,10 +487,10 @@ def _parsear_bloque_eliminatoria(
     partidos = []
     
     for codigo, (fila, col_eq1, col_g1, col_g2, col_eq2) in mapeo.items():
-        equipo1 = _leer_celda_str(df, fila, col_eq1)
+        equipo1 = normalizar_nombre_equipo(_leer_celda_str(df, fila, col_eq1))
         goles1 = _leer_celda_num(df, fila, col_g1)
         goles2 = _leer_celda_num(df, fila, col_g2)
-        equipo2 = _leer_celda_str(df, fila, col_eq2)
+        equipo2 = normalizar_nombre_equipo(_leer_celda_str(df, fila, col_eq2))
         
         # Revisar penales en la fila siguiente
         penales1 = None
@@ -564,7 +565,7 @@ def parsear_categorias_especiales(
     """
     categorias = {}
     for nombre_cat, (fila, col) in CATEGORIAS_CELDAS.items():
-        categorias[nombre_cat] = _leer_celda_str(df_final, fila, col)
+        categorias[nombre_cat] = normalizar_nombre_equipo(_leer_celda_str(df_final, fila, col))
     return categorias
 
 
@@ -603,6 +604,7 @@ def cargar_todos_los_participantes(
         )
         return pd.DataFrame(), pd.DataFrame(), {}, {}
     
+    participantes_ok = []
     st.info(f"📂 Se encontraron {len(archivos)} archivos de participantes.")
     
     todas_apuestas_grupos = []
@@ -653,12 +655,15 @@ def cargar_todos_los_participantes(
             
             todas_categorias[participante] = categorias
             
-            st.success(f"✅ {participante}: cargado correctamente")
+            participantes_ok.append(participante)
             
         except Exception as e:
             st.error(f"❌ Error leyendo archivo de {participante}: {e}")
             continue
     
+    if participantes_ok:
+        st.success(f"✅ {len(participantes_ok)} participantes cargados correctamente: {", ".join(participantes_ok)}")
+
     # Concatenar DataFrames
     df_grupos_total = (
         pd.concat(todas_apuestas_grupos, ignore_index=True)

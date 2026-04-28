@@ -159,5 +159,5 @@ def obtener_categorias_reales_simuladas():
     categorias = calcular_todas_las_categorias(resultados)
     # Override manual para Figura y Goleador
     categorias["Figura"] = "Messi"
-    categorias["Goleador"] = "Messi"
+    categorias["Goleador"] = "Kane"
     return categorias
