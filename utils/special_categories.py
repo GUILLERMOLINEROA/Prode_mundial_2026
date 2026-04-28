@@ -1,244 +1,137 @@
-# =============================================================================
-# utils/special_categories.py
-# Módulo que determina los resultados reales de las categorías especiales:
-# Revelación, Decepción, Mejor 1era Fase, Peor Equipo, etc.
-#
-# REGLAS (de la imagen adjunta):
-# - Hay 4 clases de equipos según historia, importancia, vigencia y Ranking FIFA.
-# - El PEOR de los equipos Clase 1 es automáticamente la Decepción.
-#   (Si hay 3 equipos Clase 1'; si hay empate entre un 1' y un 1, 
-#    el Clase 1 será decepción)
-# - Los equipos Clase 2, 3 y 4 podrán ser Revelación:
-#   * Clase 2: solo si llega a Semis
-#   * Clase 3: solo si llega a 4tos
-#   * Clase 4: solo si pasa de grupos
-# - El que haya llegado más lejos de los equipos Clase 2, 3 o 4 será la Revelación.
-# - En caso de empate en ronda, se valora mejor a los de peor clase.
-# - Dentro de una misma clase, se desempata por puntos/goles en tabla general.
-# - El último criterio de desempate es el Ranking FIFA al 1/4/2026 
-#   (el de peor ranking queda más alto).
-# - Puede darse que NO HAYA equipo revelación.
-# =============================================================================
-
 import pandas as pd
-from typing import Dict, Optional, Tuple
+import os
+from typing import Dict, Optional
+from utils.api_football import clasificar_ronda
 
-
-# Orden jerárquico de las rondas (mayor = llegó más lejos)
-ORDEN_RONDAS = {
-    "grupos": 0,
-    "16vos": 1,
-    "8vos": 2,
-    "4tos": 3,
-    "semis": 4,
-    "final": 5,
-    "campeon": 6,
+ORDEN_FASES = {
+    "grupos": 0, "16vos": 1, "8vos": 2, "4tos": 3,
+    "semis": 4, "final": 5, "campeon": 6,
 }
 
+REQUISITOS_REVELACION = {
+    2: 4,  # Clase 2: debe llegar a semis
+    3: 3,  # Clase 3: debe llegar a 4tos
+    4: 1,  # Clase 4: debe pasar de grupos
+}
 
-def determinar_decepcion(
-    equipos_clase: pd.DataFrame,
-    max_ronda_por_equipo: Dict[str, str]
-) -> str:
-    """
-    Determina el equipo Decepción del torneo.
-    
-    Regla: El PEOR de los equipos Clase 1 es automáticamente la Decepción.
-    Si hay sub-clases (1 y 1'), y hay empate, el Clase 1 puro pierde.
-    
-    Parámetros:
-        equipos_clase: DataFrame con columnas [pais, clase, ranking_fifa, class_1_sub]
-        max_ronda_por_equipo: Dict {equipo: máxima_ronda_alcanzada}
-    
-    Retorna: Nombre del equipo decepción
-    """
-    # Filtrar equipos Clase 1
+def cargar_equipos_clase():
+    path = os.path.join("data", "equipos_clase.csv")
+    if os.path.exists(path):
+        return pd.read_csv(path)
+    return pd.DataFrame()
+
+def calcular_fase_maxima_por_equipo(resultados):
+    if resultados.empty:
+        return {}
+    fase_maxima = {}
+    for _, p in resultados.iterrows():
+        ronda = clasificar_ronda(str(p.get("ronda", "")))
+        orden = ORDEN_FASES.get(ronda, -1)
+        for eq in [p.get("equipo_local", ""), p.get("equipo_visitante", "")]:
+            if eq:
+                fase_maxima[eq] = max(fase_maxima.get(eq, 0), orden)
+    finales = resultados[
+        resultados["ronda"].str.lower().str.contains("final", na=False) &
+        ~resultados["ronda"].str.lower().str.contains("semi|quarter|3rd", na=False)]
+    if not finales.empty:
+        f = finales.iloc[-1]
+        gl, gv = f.get("goles_local"), f.get("goles_visitante")
+        pl, pv = f.get("penales_local"), f.get("penales_visitante")
+        campeon = ""
+        if pd.notna(gl) and pd.notna(gv):
+            if gl > gv: campeon = f["equipo_local"]
+            elif gv > gl: campeon = f["equipo_visitante"]
+            elif pd.notna(pl) and pd.notna(pv):
+                campeon = f["equipo_local"] if pl > pv else f["equipo_visitante"]
+        if campeon:
+            fase_maxima[campeon] = 6
+    return fase_maxima
+
+def calcular_tabla_grupos(resultados):
+    if resultados.empty:
+        return pd.DataFrame()
+    partidos_g = resultados[resultados["ronda"].apply(lambda x: clasificar_ronda(str(x))) == "grupos"]
+    if partidos_g.empty:
+        return pd.DataFrame()
+    tabla = {}
+    for _, p in partidos_g.iterrows():
+        local, visitante = p["equipo_local"], p["equipo_visitante"]
+        gl, gv = p["goles_local"], p["goles_visitante"]
+        if pd.isna(gl) or pd.isna(gv):
+            continue
+        gl, gv = int(gl), int(gv)
+        for eq in [local, visitante]:
+            if eq not in tabla:
+                tabla[eq] = {"equipo": eq, "grupo": p["ronda"], "pts": 0, "gf": 0, "gc": 0, "jugados": 0}
+        tabla[local]["jugados"] += 1
+        tabla[visitante]["jugados"] += 1
+        if gl > gv:
+            tabla[local]["pts"] += 3
+        elif gv > gl:
+            tabla[visitante]["pts"] += 3
+        else:
+            tabla[local]["pts"] += 1
+            tabla[visitante]["pts"] += 1
+        tabla[local]["gf"] += gl
+        tabla[local]["gc"] += gv
+        tabla[visitante]["gf"] += gv
+        tabla[visitante]["gc"] += gl
+    datos = list(tabla.values())
+    for d in datos:
+        d["dg"] = d["gf"] - d["gc"]
+    return pd.DataFrame(datos).sort_values(by=["pts", "dg", "gf"], ascending=[False, False, False])
+
+def determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos):
+    if equipos_clase.empty:
+        return ""
     clase_1 = equipos_clase[equipos_clase["clase"] == 1].copy()
-    
     if clase_1.empty:
         return ""
-    
-    # Asignar la ronda máxima alcanzada
-    clase_1["max_ronda"] = clase_1["pais"].map(max_ronda_por_equipo).fillna("grupos")
-    clase_1["ronda_orden"] = clase_1["max_ronda"].map(ORDEN_RONDAS).fillna(0)
-    
-    # Ordenar: menor ronda primero (peor rendimiento), luego por sub-clase
-    # (class_1_sub=1 es "puro" Clase 1, class_1_sub=2 es Clase 1')
-    # En empate de ronda, el Clase 1 puro (sub=1) es más decepcionante
-    clase_1 = clase_1.sort_values(
-        by=["ronda_orden", "class_1_sub", "ranking_fifa"],
-        ascending=[True, True, True]  # Menor ronda, clase pura, mejor ranking = más decepción
-    )
-    
+    clase_1["fase_max"] = clase_1["pais"].map(fase_maxima).fillna(0).astype(int)
+    clase_1["sub"] = clase_1["class_1_sub"].fillna(1).astype(int)
+    clase_1 = clase_1.sort_values(by=["fase_max", "sub", "ranking_fifa"], ascending=[True, True, True])
     return clase_1.iloc[0]["pais"]
 
-
-def determinar_revelacion(
-    equipos_clase: pd.DataFrame,
-    max_ronda_por_equipo: Dict[str, str]
-) -> Optional[str]:
-    """
-    Determina el equipo Revelación del torneo.
-    
-    Reglas:
-    - Clase 2: revelación solo si llega a Semis
-    - Clase 3: revelación solo si llega a 4tos
-    - Clase 4: revelación solo si pasa de grupos (16vos)
-    - El que llegó más lejos gana.
-    - En empate de ronda: se valora mejor al de peor clase.
-    - Dentro de misma clase: desempate por puntos/goles.
-    - Último desempate: Ranking FIFA (peor ranking = más arriba).
-    - Puede NO haber revelación.
-    """
-    # Requisitos mínimos por clase
-    requisitos_minimos = {
-        2: "semis",     # Clase 2 debe llegar al menos a semis
-        3: "4tos",      # Clase 3 debe llegar al menos a cuartos
-        4: "16vos",     # Clase 4 debe al menos pasar de grupos
-    }
-    
+def determinar_revelacion(equipos_clase, fase_maxima):
+    if equipos_clase.empty:
+        return None
     candidatos = []
-    
-    for clase, ronda_minima in requisitos_minimos.items():
-        equipos_clase_n = equipos_clase[equipos_clase["clase"] == clase]
-        ronda_min_orden = ORDEN_RONDAS.get(ronda_minima, 0)
-        
-        for _, equipo in equipos_clase_n.iterrows():
-            max_ronda = max_ronda_por_equipo.get(equipo["pais"], "grupos")
-            max_ronda_ord = ORDEN_RONDAS.get(max_ronda, 0)
-            
-            if max_ronda_ord >= ronda_min_orden:
-                candidatos.append({
-                    "pais": equipo["pais"],
-                    "clase": clase,
-                    "max_ronda": max_ronda,
-                    "ronda_orden": max_ronda_ord,
-                    "ranking_fifa": equipo["ranking_fifa"],
-                })
-    
+    for clase, min_orden in REQUISITOS_REVELACION.items():
+        eqs = equipos_clase[equipos_clase["clase"] == clase]
+        for _, eq in eqs.iterrows():
+            fase = fase_maxima.get(eq["pais"], 0)
+            if fase >= min_orden:
+                candidatos.append({"pais": eq["pais"], "clase": clase,
+                    "fase_max": fase, "ranking_fifa": eq["ranking_fifa"]})
     if not candidatos:
-        return None  # No hay revelación
-    
-    df_candidatos = pd.DataFrame(candidatos)
-    
-    # Ordenar: mayor ronda primero, luego peor clase (mayor número),
-    # luego peor ranking (mayor número = más mérito)
-    df_candidatos = df_candidatos.sort_values(
-        by=["ronda_orden", "clase", "ranking_fifa"],
-        ascending=[False, False, False]
-    )
-    
-    return df_candidatos.iloc[0]["pais"]
+        return None
+    df = pd.DataFrame(candidatos)
+    df = df.sort_values(by=["fase_max", "clase", "ranking_fifa"], ascending=[False, False, False])
+    return df.iloc[0]["pais"]
 
-
-def determinar_mejor_primera_fase(
-    resultados_grupos: pd.DataFrame
-) -> str:
-    """
-    Determina el equipo con mejor rendimiento en fase de grupos.
-    Se basa en puntos (3 por victoria, 1 por empate) y diferencia de goles.
-    """
-    # Calcular tabla de posiciones de fase de grupos
-    equipos_stats = {}
-    
-    for _, partido in resultados_grupos.iterrows():
-        local = partido["equipo_local"]
-        visitante = partido["equipo_visitante"]
-        gl = partido["goles_local"]
-        gv = partido["goles_visitante"]
-        
-        if pd.isna(gl) or pd.isna(gv):
-            continue
-        
-        for equipo in [local, visitante]:
-            if equipo not in equipos_stats:
-                equipos_stats[equipo] = {"puntos": 0, "gf": 0, "gc": 0, "dg": 0}
-        
-        if gl > gv:  # Gana local
-            equipos_stats[local]["puntos"] += 3
-        elif gv > gl:  # Gana visitante
-            equipos_stats[visitante]["puntos"] += 3
-        else:  # Empate
-            equipos_stats[local]["puntos"] += 1
-            equipos_stats[visitante]["puntos"] += 1
-        
-        equipos_stats[local]["gf"] += gl
-        equipos_stats[local]["gc"] += gv
-        equipos_stats[visitante]["gf"] += gv
-        equipos_stats[visitante]["gc"] += gl
-    
-    # Calcular diferencia de goles
-    for equipo in equipos_stats:
-        equipos_stats[equipo]["dg"] = (
-            equipos_stats[equipo]["gf"] - equipos_stats[equipo]["gc"]
-        )
-    
-    if not equipos_stats:
+def determinar_mejor_primera_fase(tabla_grupos):
+    if tabla_grupos.empty:
         return ""
-    
-    # Ordenar por puntos desc, dg desc, gf desc
-    ranking = sorted(
-        equipos_stats.items(),
-        key=lambda x: (x[1]["puntos"], x[1]["dg"], x[1]["gf"]),
-        reverse=True
-    )
-    
-    return ranking[0][0]  # El mejor equipo
+    mejor = tabla_grupos.sort_values(by=["pts", "dg", "gf"], ascending=[False, False, False]).iloc[0]
+    return mejor["equipo"]
 
-
-def determinar_peor_equipo(
-    resultados_grupos: pd.DataFrame,
-    max_ronda_por_equipo: Dict[str, str]
-) -> str:
-    """
-    Determina el peor equipo del torneo.
-    El que fue eliminado más temprano con peor rendimiento.
-    """
-    equipos_stats = {}
-    
-    for _, partido in resultados_grupos.iterrows():
-        local = partido["equipo_local"]
-        visitante = partido["equipo_visitante"]
-        gl = partido["goles_local"]
-        gv = partido["goles_visitante"]
-        
-        if pd.isna(gl) or pd.isna(gv):
-            continue
-        
-        for equipo in [local, visitante]:
-            if equipo not in equipos_stats:
-                equipos_stats[equipo] = {"puntos": 0, "gf": 0, "gc": 0}
-        
-        if gl > gv:
-            equipos_stats[local]["puntos"] += 3
-        elif gv > gl:
-            equipos_stats[visitante]["puntos"] += 3
-        else:
-            equipos_stats[local]["puntos"] += 1
-            equipos_stats[visitante]["puntos"] += 1
-        
-        equipos_stats[local]["gf"] += gl
-        equipos_stats[local]["gc"] += gv
-        equipos_stats[visitante]["gf"] += gv
-        equipos_stats[visitante]["gc"] += gl
-    
-    if not equipos_stats:
+def determinar_peor_equipo(tabla_grupos, fase_maxima):
+    if tabla_grupos.empty:
         return ""
-    
-    # Solo considerar equipos que se quedaron en grupos
-    eliminados_grupos = {
-        eq: stats for eq, stats in equipos_stats.items()
-        if max_ronda_por_equipo.get(eq, "grupos") == "grupos"
+    df = tabla_grupos.copy()
+    df["fase_max"] = df["equipo"].map(fase_maxima).fillna(0).astype(int)
+    df = df.sort_values(by=["fase_max", "pts", "dg", "gf"], ascending=[True, True, True, True])
+    return df.iloc[0]["equipo"]
+
+def calcular_todas_las_categorias(resultados):
+    equipos_clase = cargar_equipos_clase()
+    fase_maxima = calcular_fase_maxima_por_equipo(resultados)
+    tabla_grupos = calcular_tabla_grupos(resultados)
+    return {
+        "Figura": "",
+        "Goleador": "",
+        "Revelación": determinar_revelacion(equipos_clase, fase_maxima) or "",
+        "Decepción": determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos),
+        "Mejor 1era Fase": determinar_mejor_primera_fase(tabla_grupos),
+        "Peor Equipo": determinar_peor_equipo(tabla_grupos, fase_maxima),
     }
-    
-    if not eliminados_grupos:
-        eliminados_grupos = equipos_stats
-    
-    # Ordenar por puntos asc, dg asc (peor primero)
-    ranking = sorted(
-        eliminados_grupos.items(),
-        key=lambda x: (x[1]["puntos"], x[1]["gf"] - x[1]["gc"], x[1]["gf"]),
-        ascending_default=True
-    )
-    
-    return ranking[0][0]

@@ -170,12 +170,12 @@ FINAL = {
 
 # Categorías especiales — Pestaña "Quarter, Semis & Final"
 CATEGORIAS_CELDAS = {
-    "Figura": (20, 14),
-    "Goleador": (21, 14),
-    "Revelación": (22, 14),
-    "Decepción": (23, 14),
-    "Mejor 1era Fase": (24, 14),
-    "Peor Equipo": (25, 14),
+    "Figura": (17, 18),           # Fila 18 idx 17, col S idx 18
+    "Goleador": (18, 18),         # Fila 19 idx 18, col S idx 18
+    "Revelación": (19, 18),       # Fila 20 idx 19, col S idx 18
+    "Decepción": (20, 18),        # Fila 21 idx 20, col S idx 18
+    "Mejor 1era Fase": (21, 18),  # Fila 22 idx 21, col S idx 18
+    "Peor Equipo": (22, 18),      # Fila 23 idx 22, col S idx 18
 }
 
 

@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import os
+import json
 
 from utils.excel_reader import cargar_todos_los_participantes
-from utils.simulacion import generar_resultados_simulados
+from utils.simulacion import generar_resultados_simulados, obtener_categorias_reales_simuladas
 from utils.api_football import mapear_nombre_equipo, clasificar_ronda
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
 from utils.messages import obtener_mensaje_posicion
@@ -15,6 +16,14 @@ css_path = os.path.join("assets", "style.css")
 if os.path.exists(css_path):
     with open(css_path) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+def cargar_overrides():
+    """Carga overrides manuales desde data/overrides.json"""
+    path = os.path.join("data", "overrides.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return {}
 
 def extraer_equipos_reales_por_ronda(resultados):
     if resultados.empty:
@@ -66,21 +75,20 @@ def determinar_campeon_y_tercero(resultados):
 def mostrar_leaderboard():
     st.markdown('<h1 class="titulo-prode">🏆 LEADERBOARD 🏆</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#888;">Actualizado en tiempo real. Sin piedad. Sin misericordia.</p>', unsafe_allow_html=True)
-    
-    # Cargar apuestas
+
     with st.spinner("🔄 Cargando apuestas..."):
         apuestas_grupos, pred_elim, categorias_todos, total_results_todos = cargar_todos_los_participantes()
     if not categorias_todos:
         st.warning("⚠️ No se encontraron archivos de participantes.")
         return
-    
-    # Usar simulación o API real
+
     st.markdown("---")
     usar_simulacion = st.toggle("🎮 Usar resultados SIMULADOS (para probar)", value=True)
-    
+
     if usar_simulacion:
-        st.info("🎮 Usando resultados simulados del Mundial 2026. Esto es solo para probar la app.")
+        st.info("🎮 Usando resultados simulados fijos para validación.")
         resultados = generar_resultados_simulados()
+        categorias_reales = obtener_categorias_reales_simuladas()
     else:
         from utils.api_football import obtener_partidos_mundial
         with st.spinner("🔄 Obteniendo resultados de la API..."):
@@ -88,16 +96,43 @@ def mostrar_leaderboard():
         if not resultados.empty:
             resultados["equipo_local"] = resultados["equipo_local"].apply(mapear_nombre_equipo)
             resultados["equipo_visitante"] = resultados["equipo_visitante"].apply(mapear_nombre_equipo)
-    
+        # Cargar overrides manuales
+        overrides = cargar_overrides()
+        categorias_reales = {
+            "Figura": overrides.get("Figura", ""),
+            "Goleador": overrides.get("Goleador", ""),
+            "Revelación": overrides.get("Revelación", ""),
+            "Decepción": overrides.get("Decepción", ""),
+            "Mejor 1era Fase": overrides.get("Mejor 1era Fase", ""),
+            "Peor Equipo": overrides.get("Peor Equipo", ""),
+        }
+
     equipos_reales = extraer_equipos_reales_por_ronda(resultados)
     campeon_real, tercero_real = determinar_campeon_y_tercero(resultados)
-    
+
     if campeon_real:
         st.success(f"🏆 Campeón: **{campeon_real}** | 🥉 3er puesto: **{tercero_real}**")
-    
-    categorias_reales = {"Figura": "", "Goleador": "", "Revelación": "",
-                         "Decepción": "", "Mejor 1era Fase": "", "Peor Equipo": ""}
-    
+
+    # Mostrar ultimos 3 resultados
+    from utils.api_football import obtener_ultimos_resultados
+    ultimos = obtener_ultimos_resultados(resultados, 3)
+    if not ultimos.empty:
+        st.markdown("#### ⚡ Últimos Resultados")
+        cols = st.columns(3)
+        for i, (_, p) in enumerate(ultimos.iterrows()):
+            with cols[i]:
+                gl = int(p["goles_local"])
+                gv = int(p["goles_visitante"])
+                pen_txt = ""
+                if pd.notna(p.get("penales_local")) and pd.notna(p.get("penales_visitante")):
+                    pen_txt = f" (Pen {int(p['penales_local'])}-{int(p['penales_visitante'])})"
+                st.markdown(
+                    f'<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; '
+                    f'padding:10px; text-align:center;">'
+                    f'<small style="color:#888;">{p["ronda"]}</small><br>'
+                    f'<b>{p["equipo_local"]}</b> {gl} - {gv} <b>{p["equipo_visitante"]}</b>'
+                    f'{pen_txt}</div>', unsafe_allow_html=True)
+
     # Calcular puntos
     participantes = list(categorias_todos.keys())
     todos_puntajes = []
@@ -114,39 +149,59 @@ def mostrar_leaderboard():
         todos_puntajes.append(puntaje)
         barra.progress((i + 1) / len(participantes), text=f"Calculando {part}...")
     barra.empty()
-    
+
     leaderboard = generar_leaderboard(todos_puntajes)
     st.session_state["leaderboard"] = leaderboard
     st.session_state["todos_puntajes"] = todos_puntajes
     st.session_state["resultados"] = resultados
-    
+    st.session_state["categorias_reales"] = categorias_reales
+
     # Top 3
     if not leaderboard.empty:
         st.markdown("---")
         col1, col2, col3 = st.columns(3)
+        # Cargar fotos
+        def foto_participante(nombre):
+            for ext in [".png", ".jpg", ".jpeg"]:
+                path = os.path.join("assets", "fotos", f"{nombre}{ext}")
+                if os.path.exists(path):
+                    return path
+            return None
+
         with col1:
             if len(leaderboard) >= 1:
                 l = leaderboard.iloc[0]
-                st.markdown(f'<div class="card-lider"><p class="posicion-1">🥇 #1</p>'
-                    f'<h2 style="color:#ffd700;">{l["Participante"]}</h2>'
+                foto = foto_participante(l["Participante"])
+                st.markdown(f'<div class="card-lider"><p class="posicion-1">🥇 #1</p>', unsafe_allow_html=True)
+                if foto:
+                    st.image(foto, width=80)
+                st.markdown(f'<h2 style="color:#ffd700;">{l["Participante"]}</h2>'
                     f'<p class="puntos-grandes">{int(l["Total"])}</p>'
                     f'<p style="color:#aaa;">puntos</p></div>', unsafe_allow_html=True)
         with col2:
             if len(leaderboard) >= 2:
                 s = leaderboard.iloc[1]
+                foto = foto_participante(s["Participante"])
                 st.markdown(f'<div class="card-normal" style="border-color:#c0c0c0;">'
-                    f'<p class="posicion-2">🥈 #2</p><h3>{s["Participante"]}</h3>'
+                    f'<p class="posicion-2">🥈 #2</p>', unsafe_allow_html=True)
+                if foto:
+                    st.image(foto, width=60)
+                st.markdown(f'<h3>{s["Participante"]}</h3>'
                     f'<h2>{int(s["Total"])} pts</h2></div>', unsafe_allow_html=True)
         with col3:
             if len(leaderboard) >= 3:
                 t = leaderboard.iloc[2]
+                foto = foto_participante(t["Participante"])
                 st.markdown(f'<div class="card-normal" style="border-color:#cd7f32;">'
-                    f'<p class="posicion-3">🥉 #3</p><h3>{t["Participante"]}</h3>'
+                    f'<p class="posicion-3">🥉 #3</p>', unsafe_allow_html=True)
+                if foto:
+                    st.image(foto, width=60)
+                st.markdown(f'<h3>{t["Participante"]}</h3>'
                     f'<h2>{int(t["Total"])} pts</h2></div>', unsafe_allow_html=True)
-    
+
     st.markdown("---")
     st.markdown("### 📋 Tabla Completa")
-    
+
     def estilizar(row):
         pos = row["Posición"]
         n = len(leaderboard)
@@ -155,12 +210,12 @@ def mostrar_leaderboard():
         elif pos == 3: return ['background-color: rgba(205,127,50,0.15)'] * len(row)
         elif pos >= n - 2 and n > 5: return ['background-color: rgba(0,100,200,0.15); font-style:italic'] * len(row)
         return [''] * len(row)
-    
+
     st.dataframe(leaderboard.style.apply(estilizar, axis=1),
         use_container_width=True, hide_index=True,
         height=min(len(leaderboard) * 40 + 60, 700))
-    
-    # Gráfico
+
+    # Grafico
     st.markdown("### 📊 Desglose de Puntos")
     fig = go.Figure()
     for cat, color in [("Grupos", "#2ecc71"), ("Eliminatorias", "#3498db"),
@@ -172,7 +227,7 @@ def mostrar_leaderboard():
         xaxis_title="Participante", yaxis_title="Puntos",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
-    
+
     # Mensajes
     st.markdown("---")
     st.markdown("### 💬 Mensajes del Día")

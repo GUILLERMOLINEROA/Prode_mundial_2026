@@ -1,177 +1,163 @@
 import pandas as pd
-import random
 import streamlit as st
-
-GRUPOS = {
-    "A": ["Mexico", "Corea del Sur", "Republica Checa", "Sudafrica"],
-    "B": ["Canada", "Qatar", "Suiza", "Bosnia"],
-    "C": ["Brasil", "Haiti", "Escocia", "Marruecos"],
-    "D": ["Estados Unidos", "Australia", "Turquia", "Paraguay"],
-    "E": ["Alemania", "Costa de Marfil", "Ecuador", "Curazao"],
-    "F": ["Paises Bajos", "Suecia", "Tunez", "Japon"],
-    "G": ["Iran", "Belgica", "Nueva Zelanda", "Egipto"],
-    "H": ["España", "Arabia Saudita", "Uruguay", "Cabo Verde"],
-    "I": ["Francia", "Irak", "Noruega", "Senegal"],
-    "J": ["Argentina", "Austria", "Jordania", "Argelia"],
-    "K": ["Portugal", "Uzbekistan", "Colombia", "Congo"],
-    "L": ["Inglaterra", "Ghana", "Panama", "Croacia"],
-}
-
-def _generar_goles(rng):
-    return rng.choices([0, 1, 2, 3, 4], weights=[25, 35, 25, 10, 5])[0]
-
-def _calcular_tabla_grupo(partidos_grupo):
-    tabla = {}
-    for p in partidos_grupo:
-        for eq in [p["equipo_local"], p["equipo_visitante"]]:
-            if eq not in tabla:
-                tabla[eq] = {"pts": 0, "gf": 0, "gc": 0}
-        gl, gv = p["goles_local"], p["goles_visitante"]
-        if gl > gv: tabla[p["equipo_local"]]["pts"] += 3
-        elif gv > gl: tabla[p["equipo_visitante"]]["pts"] += 3
-        else:
-            tabla[p["equipo_local"]]["pts"] += 1
-            tabla[p["equipo_visitante"]]["pts"] += 1
-        tabla[p["equipo_local"]]["gf"] += gl
-        tabla[p["equipo_local"]]["gc"] += gv
-        tabla[p["equipo_visitante"]]["gf"] += gv
-        tabla[p["equipo_visitante"]]["gc"] += gl
-    ranking = sorted(tabla.items(),
-        key=lambda x: (x[1]["pts"], x[1]["gf"] - x[1]["gc"], x[1]["gf"]), reverse=True)
-    return [eq for eq, _ in ranking]
-
-def _generar_partido_eliminatoria(rng, eq1, eq2, match_id, fecha, ronda):
-    g1 = _generar_goles(rng)
-    g2 = _generar_goles(rng)
-    pen1, pen2 = None, None
-    if g1 == g2:
-        pen1 = rng.randint(2, 5)
-        pen2 = rng.randint(2, 5)
-        while pen1 == pen2:
-            pen2 = rng.randint(2, 5)
-    ganador = eq1 if (g1 > g2 or (g1 == g2 and (pen1 or 0) > (pen2 or 0))) else eq2
-    perdedor = eq2 if ganador == eq1 else eq1
-    partido = {
-        "match_id": match_id, "fecha": fecha, "ronda": ronda,
-        "equipo_local": eq1, "equipo_visitante": eq2,
-        "goles_local": g1, "goles_visitante": g2,
-        "penales_local": pen1, "penales_visitante": pen2,
-        "estado": "FT",
-    }
-    return partido, ganador, perdedor
 
 @st.cache_data
 def generar_resultados_simulados():
-    rng = random.Random(42)
     partidos = []
-    fecha_base = pd.Timestamp("2026-06-11")
-    dia = 0
-    
-    # Fase de grupos
-    for grupo, equipos in GRUPOS.items():
-        cruces = [
-            (equipos[0], equipos[2]), (equipos[1], equipos[3]),
-            (equipos[0], equipos[3]), (equipos[2], equipos[1]),
-            (equipos[2], equipos[0]), (equipos[3], equipos[1]),
-        ]
-        for local, visitante in cruces:
-            partidos.append({
-                "match_id": len(partidos) + 1,
-                "fecha": fecha_base + pd.Timedelta(days=dia),
-                "ronda": f"Group {grupo}",
-                "equipo_local": local, "equipo_visitante": visitante,
-                "goles_local": _generar_goles(rng),
-                "goles_visitante": _generar_goles(rng),
-                "penales_local": None, "penales_visitante": None,
-                "estado": "FT",
-            })
-            dia += 0.5
-    
-    # Clasificados
-    clasificados = {}
-    for grupo, equipos in GRUPOS.items():
-        pg = [p for p in partidos if p["equipo_local"] in equipos and p["equipo_visitante"] in equipos]
-        clasificados[grupo] = _calcular_tabla_grupo(pg)
-    
-    primeros = {g: eq[0] for g, eq in clasificados.items()}
-    segundos = {g: eq[1] for g, eq in clasificados.items()}
-    terceros = [clasificados[g][2] for g in sorted(GRUPOS.keys())]
-    rng.shuffle(terceros)
-    
-    mid = len(partidos) + 1
-    fecha = pd.Timestamp("2026-07-01")
-    t = 0
-    
-    # 16vos
-    cruces_16 = [
-        (segundos["A"], segundos["B"]), (primeros["E"], terceros[t:=0] if True else ""),
-        (primeros["F"], segundos["C"]), (primeros["C"], segundos["F"]),
-        (primeros["I"], terceros[1]), (segundos["E"], segundos["I"]),
-        (primeros["A"], terceros[2]), (primeros["L"], terceros[3]),
-        (primeros["D"], terceros[4]), (primeros["G"], terceros[5]),
-        (segundos["K"], segundos["L"]), (primeros["H"], segundos["J"]),
-        (primeros["B"], terceros[6]), (segundos["G"], segundos["H"]),
-        (primeros["K"], terceros[7] if len(terceros) > 7 else terceros[0]),
-        (segundos["D"], segundos["G"]),
-    ]
-    # Fix terceros
-    cruces_16_fix = []
-    ti = 0
-    for eq1, eq2 in cruces_16:
-        if not eq2 or eq2 == "":
-            eq2 = terceros[ti % len(terceros)]
-            ti += 1
-        cruces_16_fix.append((eq1, eq2))
-    
-    gan_16 = []
-    for eq1, eq2 in cruces_16_fix:
-        p, gan, _ = _generar_partido_eliminatoria(rng, eq1, eq2, mid, fecha, "Round of 32")
-        partidos.append(p)
-        gan_16.append(gan)
-        mid += 1
-        fecha += pd.Timedelta(hours=12)
-    
-    # 8vos
-    gan_8 = []
-    for i in range(0, len(gan_16) - 1, 2):
-        p, gan, _ = _generar_partido_eliminatoria(rng, gan_16[i], gan_16[i+1], mid, fecha, "Round of 16")
-        partidos.append(p)
-        gan_8.append(gan)
-        mid += 1
-        fecha += pd.Timedelta(hours=12)
-    
-    # 4tos
-    gan_4 = []
-    perd_4 = []
-    for i in range(0, len(gan_8) - 1, 2):
-        p, gan, perd = _generar_partido_eliminatoria(rng, gan_8[i], gan_8[i+1], mid, fecha, "Quarter-finals")
-        partidos.append(p)
-        gan_4.append(gan)
-        perd_4.append(perd)
-        mid += 1
-        fecha += pd.Timedelta(hours=12)
-    
-    # Semis
-    gan_semi = []
-    perd_semi = []
-    for i in range(0, len(gan_4) - 1, 2):
-        p, gan, perd = _generar_partido_eliminatoria(rng, gan_4[i], gan_4[i+1], mid, fecha, "Semi-finals")
-        partidos.append(p)
-        gan_semi.append(gan)
-        perd_semi.append(perd)
-        mid += 1
-        fecha += pd.Timedelta(days=1)
-    
-    # 3er puesto
-    if len(perd_semi) >= 2:
-        p, _, _ = _generar_partido_eliminatoria(rng, perd_semi[0], perd_semi[1], mid, fecha, "3rd Place")
-        partidos.append(p)
-        mid += 1
-        fecha += pd.Timedelta(days=1)
-    
-    # Final
-    if len(gan_semi) >= 2:
-        p, _, _ = _generar_partido_eliminatoria(rng, gan_semi[0], gan_semi[1], mid, fecha, "Final")
-        partidos.append(p)
-    
+    mid = 1
+
+    # GRUPO A
+    for local, gl, gv, visitante, fecha in [
+        ("Mexico", 1, 1, "Sudafrica", "11/6/2026"), ("Corea del Sur", 2, 1, "Republica Checa", "11/6/2026"),
+        ("Republica Checa", 1, 1, "Sudafrica", "18/6/2026"), ("Mexico", 1, 3, "Corea del Sur", "18/6/2026"),
+        ("Republica Checa", 2, 1, "Mexico", "24/6/2026"), ("Sudafrica", 1, 1, "Corea del Sur", "24/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group A",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO B
+    for local, gl, gv, visitante, fecha in [
+        ("Canada", 1, 3, "Bosnia", "12/6/2026"), ("Qatar", 0, 0, "Suiza", "13/6/2026"),
+        ("Suiza", 1, 1, "Bosnia", "18/6/2026"), ("Canada", 1, 1, "Qatar", "18/6/2026"),
+        ("Suiza", 1, 0, "Canada", "24/6/2026"), ("Bosnia", 3, 1, "Qatar", "24/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group B",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO C
+    for local, gl, gv, visitante, fecha in [
+        ("Brasil", 2, 3, "Marruecos", "13/6/2026"), ("Haiti", 1, 2, "Escocia", "13/6/2026"),
+        ("Brasil", 3, 3, "Haiti", "19/6/2026"), ("Escocia", 1, 1, "Marruecos", "19/6/2026"),
+        ("Escocia", 3, 2, "Brasil", "24/6/2026"), ("Marruecos", 2, 3, "Haiti", "24/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group C",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO D
+    for local, gl, gv, visitante, fecha in [
+        ("Estados Unidos", 0, 1, "Paraguay", "12/6/2026"), ("Australia", 2, 1, "Turquia", "14/6/2026"),
+        ("Turquia", 3, 1, "Paraguay", "20/6/2026"), ("Estados Unidos", 3, 0, "Australia", "19/6/2026"),
+        ("Turquia", 0, 1, "Estados Unidos", "25/6/2026"), ("Paraguay", 2, 3, "Australia", "25/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group D",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO E
+    for local, gl, gv, visitante, fecha in [
+        ("Alemania", 3, 1, "Curazao", "14/6/2026"), ("Costa de Marfil", 2, 0, "Ecuador", "14/6/2026"),
+        ("Alemania", 1, 0, "Costa de Marfil", "20/6/2026"), ("Ecuador", 0, 0, "Curazao", "20/6/2026"),
+        ("Ecuador", 0, 3, "Alemania", "25/6/2026"), ("Curazao", 3, 3, "Costa de Marfil", "25/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group E",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO F
+    for local, gl, gv, visitante, fecha in [
+        ("Paises Bajos", 1, 3, "Japon", "17/6/2026"), ("Suecia", 0, 0, "Tunez", "14/6/2026"),
+        ("Paises Bajos", 1, 1, "Suecia", "20/6/2026"), ("Tunez", 0, 2, "Japon", "21/6/2026"),
+        ("Japon", 3, 1, "Suecia", "25/6/2026"), ("Tunez", 1, 1, "Paises Bajos", "25/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group F",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO G
+    for local, gl, gv, visitante, fecha in [
+        ("Iran", 2, 0, "Nueva Zelanda", "15/6/2026"), ("Belgica", 1, 1, "Egipto", "15/6/2026"),
+        ("Belgica", 3, 2, "Iran", "21/6/2026"), ("Nueva Zelanda", 2, 1, "Egipto", "21/6/2026"),
+        ("Nueva Zelanda", 2, 0, "Belgica", "27/6/2026"), ("Egipto", 0, 1, "Iran", "27/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group G",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO H
+    for local, gl, gv, visitante, fecha in [
+        ("España", 3, 0, "Cabo Verde", "15/6/2026"), ("Arabia Saudita", 1, 2, "Uruguay", "15/6/2026"),
+        ("España", 3, 3, "Arabia Saudita", "21/6/2026"), ("Uruguay", 1, 0, "Cabo Verde", "21/6/2026"),
+        ("Uruguay", 3, 3, "España", "26/6/2026"), ("Cabo Verde", 0, 1, "Arabia Saudita", "26/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group H",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO I
+    for local, gl, gv, visitante, fecha in [
+        ("Francia", 0, 1, "Senegal", "16/6/2026"), ("Irak", 0, 1, "Noruega", "16/6/2026"),
+        ("Francia", 2, 3, "Irak", "22/6/2026"), ("Noruega", 1, 1, "Senegal", "22/6/2026"),
+        ("Noruega", 2, 1, "Francia", "26/6/2026"), ("Senegal", 0, 0, "Irak", "26/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group I",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO J
+    for local, gl, gv, visitante, fecha in [
+        ("Argentina", 2, 2, "Argelia", "16/6/2026"), ("Austria", 3, 1, "Jordania", "17/6/2026"),
+        ("Argentina", 0, 1, "Austria", "22/6/2026"), ("Jordania", 2, 3, "Argelia", "23/6/2026"),
+        ("Jordania", 2, 0, "Argentina", "27/6/2026"), ("Argelia", 0, 0, "Austria", "27/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group J",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO K
+    for local, gl, gv, visitante, fecha in [
+        ("Portugal", 0, 1, "Congo", "17/6/2026"), ("Uzbekistan", 2, 3, "Colombia", "17/6/2026"),
+        ("Portugal", 3, 2, "Uzbekistan", "23/6/2026"), ("Colombia", 1, 1, "Congo", "23/6/2026"),
+        ("Colombia", 3, 2, "Portugal", "27/6/2026"), ("Congo", 0, 1, "Uzbekistan", "27/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group K",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # GRUPO L
+    for local, gl, gv, visitante, fecha in [
+        ("Inglaterra", 0, 1, "Croacia", "17/6/2026"), ("Ghana", 0, 2, "Panama", "17/6/2026"),
+        ("Inglaterra", 1, 1, "Ghana", "23/6/2026"), ("Panama", 2, 3, "Croacia", "23/6/2026"),
+        ("Panama", 1, 2, "Inglaterra", "27/6/2026"), ("Croacia", 1, 3, "Ghana", "27/6/2026")]:
+        partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha), "ronda": "Group L",
+            "equipo_local": local, "equipo_visitante": visitante, "goles_local": gl, "goles_visitante": gv,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+
+    # ELIMINATORIAS - todos 1-0
+    fecha_e = pd.Timestamp("2026-07-01")
+    for local, visitante, ronda in [
+        ("Republica Checa","Suiza","Round of 32"),("Alemania","Marruecos","Round of 32"),
+        ("Japon","Haiti","Round of 32"),("Escocia","Paises Bajos","Round of 32"),
+        ("Noruega","Turquia","Round of 32"),("Costa de Marfil","Senegal","Round of 32"),
+        ("Corea del Sur","Arabia Saudita","Round of 32"),("Croacia","Irak","Round of 32"),
+        ("Estados Unidos","Jordania","Round of 32"),("Iran","Sudafrica","Round of 32"),
+        ("Congo","Ghana","Round of 32"),("Uruguay","Argelia","Round of 32"),
+        ("Bosnia","Belgica","Round of 32"),("Austria","España","Round of 32"),
+        ("Colombia","Inglaterra","Round of 32"),("Australia","Nueva Zelanda","Round of 32"),
+        ("Alemania","Noruega","Round of 16"),("Republica Checa","Japon","Round of 16"),
+        ("Escocia","Costa de Marfil","Round of 16"),("Corea del Sur","Croacia","Round of 16"),
+        ("Congo","Uruguay","Round of 16"),("Estados Unidos","Iran","Round of 16"),
+        ("Austria","Australia","Round of 16"),("Bosnia","Colombia","Round of 16"),
+        ("Alemania","Republica Checa","Quarter-finals"),("Congo","Estados Unidos","Quarter-finals"),
+        ("Escocia","Corea del Sur","Quarter-finals"),("Austria","Bosnia","Quarter-finals"),
+        ("Alemania","Congo","Semi-finals"),("Escocia","Austria","Semi-finals")]:
+        partidos.append({"match_id": mid, "fecha": fecha_e, "ronda": ronda,
+            "equipo_local": local, "equipo_visitante": visitante,
+            "goles_local": 1, "goles_visitante": 0,
+            "penales_local": None, "penales_visitante": None, "estado": "FT"})
+        mid += 1; fecha_e += pd.Timedelta(hours=6)
+
+    # 3er puesto y Final
+    partidos.append({"match_id": mid, "fecha": pd.Timestamp("2026-07-18"), "ronda": "3rd Place",
+        "equipo_local": "Congo", "equipo_visitante": "Austria", "goles_local": 1, "goles_visitante": 0,
+        "penales_local": None, "penales_visitante": None, "estado": "FT"}); mid += 1
+    partidos.append({"match_id": mid, "fecha": pd.Timestamp("2026-07-19"), "ronda": "Final",
+        "equipo_local": "Alemania", "equipo_visitante": "Escocia", "goles_local": 1, "goles_visitante": 0,
+        "penales_local": None, "penales_visitante": None, "estado": "FT"})
+
     return pd.DataFrame(partidos)
+
+
+def obtener_categorias_reales_simuladas():
+    """
+    Calcula las categorias automaticamente a partir de los resultados simulados.
+    Figura y Goleador se definen manualmente.
+    """
+    from utils.special_categories import calcular_todas_las_categorias
+    resultados = generar_resultados_simulados()
+    categorias = calcular_todas_las_categorias(resultados)
+    # Override manual para Figura y Goleador
+    categorias["Figura"] = "Messi"
+    categorias["Goleador"] = "Messi"
+    return categorias
