@@ -218,15 +218,62 @@ def mostrar_leaderboard():
     # Grafico
     st.markdown("### 📊 Desglose de Puntos")
     fig = go.Figure()
-    for cat, color in [("Grupos", "#2ecc71"), ("Eliminatorias", "#3498db"),
-        ("Campeón", "#f1c40f"), ("3ero", "#e67e22"),
-        ("Especiales", "#9b59b6"), ("Penalidades", "#e74c3c")]:
-        fig.add_trace(go.Bar(x=leaderboard["Participante"], y=leaderboard[cat],
-            name=cat, marker_color=color))
-    fig.update_layout(barmode='stack', template="plotly_dark", height=500,
+    # Construir barras manualmente con base = penalidad
+    # Cada participante empieza desde su penalidad (piso negativo)
+    categorias_barras = [("Grupos", "#2ecc71"), ("Eliminatorias", "#3498db"),
+        ("Campeón", "#f1c40f"), ("3ero", "#e67e22"), ("Especiales", "#9b59b6")]
+    
+    # Calcular la base acumulada para cada participante
+    for cat_idx, (cat, color) in enumerate(categorias_barras):
+        bases = []
+        for _, row in leaderboard.iterrows():
+            pen = float(row["Penalidades"])
+            # Sumar las categorias anteriores para calcular la base
+            base = pen
+            for prev_cat, _ in categorias_barras[:cat_idx]:
+                base += float(row[prev_cat])
+            bases.append(base)
+        
+        fig.add_trace(go.Bar(
+            x=leaderboard["Participante"],
+            y=leaderboard[cat],
+            base=bases,
+            name=cat,
+            marker_color=color,
+            hovertemplate="<b>%{x}</b><br>" + cat + ": %{y}<extra></extra>",
+        ))
+    
+    # Anotaciones de penalidad en la zona negativa
+    for _, row in leaderboard.iterrows():
+        pen = int(row["Penalidades"])
+        if pen < 0:
+            fig.add_annotation(
+                x=row["Participante"], y=pen/2,
+                text=f"<b>{pen}</b>",
+                showarrow=False,
+                font=dict(color="#e74c3c", size=11, family="Arial Black"),
+            )
+    
+    fig.update_layout(barmode="overlay", template="plotly_dark", height=550,
         xaxis_title="Participante", yaxis_title="Puntos",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        yaxis=dict(
+            zeroline=True, zerolinecolor="rgba(255,255,255,0.4)", zerolinewidth=2,
+        ),
+        bargap=0.3,
+    )
     st.plotly_chart(fig, use_container_width=True)
+    # Verificar si hay penalidades para el comentario toxico
+    hay_penalidades = (leaderboard["Penalidades"] < 0).any()
+    if hay_penalidades:
+        penalizados = leaderboard[leaderboard["Penalidades"] < 0]["Participante"].tolist()
+        if len(penalizados) == 1:
+            msg_pen = f"⚠️ *{penalizados[0]} arranca desde el subsuelo por sus predicciones desastrosas. Mientras otros parten de cero, vos partís desde la vergüenza.*"
+        elif len(penalizados) <= 3:
+            msg_pen = f"⚠️ *{', '.join(penalizados[:-1])} y {penalizados[-1]}: sus predicciones fueron tan malas que ni siquiera arrancan de cero. Bienvenidos al sótano del PRODE.*"
+        else:
+            msg_pen = f"⚠️ *{len(penalizados)} de {len(leaderboard)} participantes arrancan en números rojos. ¿Esto es un PRODE o un cementerio de predicciones? Las penalidades no perdonan.*"
+        st.markdown(f"> {msg_pen}")
 
     # Mensajes
     st.markdown("---")

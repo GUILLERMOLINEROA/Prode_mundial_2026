@@ -125,13 +125,48 @@ def main():
     if n > 0:
         promedios = [v / n for v in promedios]
 
+    # Calcular valores del primero y ultimo
+    puntajes_ordenados = sorted(todos_puntajes, key=lambda x: x['total'], reverse=True)
+    primero = puntajes_ordenados[0]
+    ultimo = puntajes_ordenados[-1]
+    
+    def vals_de_puntaje(p):
+        pr = p.get('pts_por_ronda_elim', {})
+        return [
+            p['pts_grupos'], pr.get('16vos',0), pr.get('8vos',0), pr.get('4tos',0),
+            pr.get('semis',0)+pr.get('final',0)+p['pts_campeon'], p['pts_especiales']
+        ]
+    
+    vals_primero = vals_de_puntaje(primero)
+    vals_ultimo = vals_de_puntaje(ultimo)
+    
     fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=valores_part + [valores_part[0]],
-        theta=categorias_radar + [categorias_radar[0]], fill='toself', name=seleccionado,
-        line_color='#ff4500', fillcolor='rgba(255, 69, 0, 0.3)'))
-    fig.add_trace(go.Scatterpolar(r=promedios + [promedios[0]],
-        theta=categorias_radar + [categorias_radar[0]], fill='toself', name='Promedio Oficina',
-        line_color='#1e90ff', fillcolor='rgba(30, 144, 255, 0.15)'))
+    
+    # Primero (dorado, punteado)
+    if primero['participante'] != seleccionado:
+        fig.add_trace(go.Scatterpolar(r=vals_primero+[vals_primero[0]], theta=categorias_radar+[categorias_radar[0]],
+            fill='toself', name=f"🥇 {primero['participante']}",
+            line_color='#ffd700', fillcolor='rgba(255,215,0,0.1)',
+            line=dict(width=2, dash='dot')))
+    
+    # Ultimo (azul hielo, punteado)
+    if ultimo['participante'] != seleccionado:
+        fig.add_trace(go.Scatterpolar(r=vals_ultimo+[vals_ultimo[0]], theta=categorias_radar+[categorias_radar[0]],
+            fill='toself', name=f"💀 {ultimo['participante']}",
+            line_color='#00bfff', fillcolor='rgba(0,191,255,0.05)',
+            line=dict(width=2, dash='dot')))
+    
+    # Participante seleccionado (naranja, prominente)
+    fig.add_trace(go.Scatterpolar(r=valores_part+[valores_part[0]], theta=categorias_radar+[categorias_radar[0]],
+        fill='toself', name=seleccionado,
+        line_color='#ff4500', fillcolor='rgba(255,69,0,0.3)',
+        line=dict(width=3)))
+    
+    # Promedio oficina
+    fig.add_trace(go.Scatterpolar(r=promedios+[promedios[0]], theta=categorias_radar+[categorias_radar[0]],
+        fill='toself', name='Promedio Oficina',
+        line_color='#1e90ff', fillcolor='rgba(30,144,255,0.15)',
+        line=dict(width=2)))
     fig.update_layout(polar=dict(bgcolor='rgba(0,0,0,0)',
         radialaxis=dict(visible=True, gridcolor='rgba(255,255,255,0.1)')),
         showlegend=True, template="plotly_dark", height=450,

@@ -605,7 +605,6 @@ def cargar_todos_los_participantes(
         return pd.DataFrame(), pd.DataFrame(), {}, {}
     
     participantes_ok = []
-    st.info(f"📂 Se encontraron {len(archivos)} archivos de participantes.")
     
     todas_apuestas_grupos = []
     todas_pred_elim = []
@@ -661,8 +660,7 @@ def cargar_todos_los_participantes(
             st.error(f"❌ Error leyendo archivo de {participante}: {e}")
             continue
     
-    if participantes_ok:
-        st.success(f"✅ {len(participantes_ok)} participantes cargados correctamente: {", ".join(participantes_ok)}")
+    # Carga silenciosa - sin mensajes
 
     # Concatenar DataFrames
     df_grupos_total = (

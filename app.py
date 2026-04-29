@@ -105,5 +105,71 @@ def main():
     st.markdown('<p style="text-align:center; font-size:1.1rem; margin-top:20px;">'
         '👈 Usá el menú lateral para navegar</p>', unsafe_allow_html=True)
 
+    # Lista de participantes con comentarios picantes sobre sus campeones
+    if exito and "categorias_todos" in st.session_state:
+        st.divider()
+        st.markdown("### 🎭 Los Apostadores y sus Delirios")
+        st.markdown("*Cada uno eligió a su campeón... algunos con más criterio que otros.*")
+        st.markdown("")
+        
+        categorias_todos = st.session_state.get("categorias_todos", {})
+        
+        # Comentarios picantes - contexto: oficina ARGENTINA
+        comentarios_campeon = {
+            "Argentina": "Obvio, papá. ¿Quién no va con la Scaloneta? Ah sí... los traidores de abajo.",
+            "Brasil": "Ir con Brasil siendo argentino es como aplaudir un gol en contra. Traidor.",
+            "Francia": "¿Francia? ¿Después de lo que nos hicieron sufrir en Qatar? Memoria selectiva la tuya.",
+            "Alemania": "Eficiencia alemana. Aburrido pero respetable. Al menos no es Inglaterra.",
+            "España": "Tiki-taka hasta que los eliminen en cuartos como siempre.",
+            "Inglaterra": "🚨 ALERTA: TRAIDOR A LA PATRIA DETECTADO. ¿Inglaterra? ¿EN SERIO? Las Malvinas son argentinas y este pone a Inglaterra campeón. Que le revisen el DNI.",
+            "Portugal": "CR7 con andador. Romántico pero delirante.",
+            "Paises Bajos": "La naranja mecánica: siempre de novias, nunca de novia.",
+            "Belgica": "Generación dorada que se oxida sin ganar nada. Dale, esta vez sí...",
+            "Uruguay": "Los primos del otro lado del charco. Garra charrúa con mate y nostalgia.",
+            "Colombia": "James, Díaz y mucha cumbia. ¿Alcanza? Spoiler: probablemente no.",
+            "Croacia": "Modric tiene más mundiales encima que años de vida. Guerreros.",
+            "Mexico": "Quinto partido, sexto partido... algún día van a pasar de octavos. ¿No?",
+            "Estados Unidos": "Campeón de local? Esto no es el Super Bowl, amigo.",
+            "Japon": "Si el anime nos enseñó algo es que Japón siempre gana al final. ¿Será?",
+            "Marruecos": "Los leones del Atlas rugieron en Qatar. ¿Pueden rugir más fuerte?",
+            "Escocia": "Escocia campeón... y yo soy astronauta. Puntos por la creatividad.",
+            "Noruega": "Haaland solo contra el mundo. Un vikingo con gol pero sin equipo.",
+            "Suiza": "Neutral en todo, hasta en las apuestas. Tibio.",
+            "Senegal": "Los Leones de la Teranga. Valiente apuesta, hay que reconocerlo.",
+            "Ecuador": "¡Sí se puede! Gritó la hinchada. La historia dice que no.",
+            "Canada": "¿Canadá campeón del mundo? Esto no es hockey sobre hielo, amigo.",
+        }
+        
+        comentario_default_list = [
+            "¿Esto va en serio o le hackearon el Excel?",
+            "Apuesta tan arriesgada que debería pagar impuestos.",
+            "Le puso más huevos que criterio. Respetable.",
+            "Si esto sale, nos retiramos todos del PRODE.",
+            "Audaz. Delirante. Probablemente borracho cuando lo completó.",
+            "Eligió con el corazón. Lástima que el corazón no sabe de fútbol.",
+        ]
+        
+        import random
+        for i, (nombre, cats) in enumerate(sorted(categorias_todos.items()), 1):
+            campeon = cats.get("Campeon", "No definido")
+            comentario = comentarios_campeon.get(campeon, "")
+            if not comentario:
+                random.seed(hash(nombre + campeon))
+                comentario = random.choice(comentario_default_list)
+            
+            # Buscar foto
+            from utils.data_loader import foto_participante
+            foto = foto_participante(nombre)
+            
+            col_num, col_foto, col_info = st.columns([0.5, 0.8, 10])
+            with col_num:
+                st.markdown(f"**{i}.**")
+            with col_foto:
+                if foto:
+                    st.image(foto, width=35)
+            with col_info:
+                comentario_html = f'<span style="color: #888; font-size: 0.9rem;">{comentario}</span>'
+                st.markdown(f'**{nombre}** → 🏆 *{campeon}*')
+                st.markdown(comentario_html, unsafe_allow_html=True)
 if __name__ == "__main__":
     main()

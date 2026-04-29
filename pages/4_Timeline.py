@@ -84,15 +84,34 @@ def calcular_evolucion_puntos():
                 "evento": evento,
             })
 
-        # Bonos y penalidades al final
+        # Penalidades se aplican cuando se confirman durante el torneo
+        # Revelacion en grupos y Peor pasa grupos: al terminar grupos
+        # Campeon no llega a 4tos: al terminar 4tos
+        # Decepcion llega a semis: al terminar semis
+        # Por simplicidad en la simulacion, distribuimos las penalidades
+        # y bonos al final del torneo
         pts_extras = (puntaje_data["pts_campeon"] + puntaje_data["pts_tercero"] +
                      puntaje_data["pts_especiales"] + puntaje_data["pts_penalidades"])
-        if pts_extras != 0:
+        
+        # Primero aplicar penalidades (bajan la linea)
+        if puntaje_data["pts_penalidades"] < 0:
+            puntos_acum += puntaje_data["pts_penalidades"]
+            evolucion.append({
+                "participante": part,
+                "fecha": pd.Timestamp("2026-07-19 12:00:00"),
+                "puntos": puntos_acum,
+                "evento": f"Penalidades: {puntaje_data['pts_penalidades']}",
+            })
+        
+        # Despues aplicar bonos positivos
+        pts_bonos = puntaje_data["pts_campeon"] + puntaje_data["pts_tercero"] + puntaje_data["pts_especiales"]
+        if pts_bonos > 0:
+            puntos_acum += pts_bonos
             evolucion.append({
                 "participante": part,
                 "fecha": pd.Timestamp("2026-07-20"),
-                "puntos": puntos_acum + pts_extras,
-                "evento": f"Bonos: +{pts_extras}" if pts_extras > 0 else f"Bonos y Penalidades: {pts_extras}",
+                "puntos": puntos_acum,
+                "evento": f"Bonos: +{pts_bonos} (Campeon:{puntaje_data['pts_campeon']}, 3ero:{puntaje_data['pts_tercero']}, Esp:{puntaje_data['pts_especiales']})",
             })
 
     return pd.DataFrame(evolucion)
