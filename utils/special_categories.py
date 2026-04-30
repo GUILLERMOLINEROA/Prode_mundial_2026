@@ -130,7 +130,7 @@ def calcular_todas_las_categorias(resultados):
     return {
         "Figura": "",
         "Goleador": "",
-        "Revelación": determinar_revelacion(equipos_clase, fase_maxima) or "",
+        "Revelación": determinar_revelacion(equipos_clase, fase_maxima) or "No hay Revelación",
         "Decepción": determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos),
         "Mejor 1era Fase": determinar_mejor_primera_fase(tabla_grupos),
         "Peor Equipo": determinar_peor_equipo(tabla_grupos, fase_maxima),

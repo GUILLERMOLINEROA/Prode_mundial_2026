@@ -169,8 +169,11 @@ for nombre, cats in sorted(categorias.items()):
             st.markdown(f"#### {nombre}")
         with c3:
             st.markdown(
-                f"🏆 **{campeon}** | ⚽ {goleador} | ⭐ {figura} | "
-                f"💡 {revelacion} | 💀 {decepcion}"
+                f"🏆 Campeón: **{campeon}** | ⚽ Goleador: **{goleador}** | "
+                f"⭐ Figura: **{figura}**"
+            )
+            st.markdown(
+                f"💡 Revelación: **{revelacion}** | 💀 Decepción: **{decepcion}**"
             )
             st.markdown(f'<span style="color:#C8E600; font-style:italic;">{comentario}</span>',
                 unsafe_allow_html=True)
