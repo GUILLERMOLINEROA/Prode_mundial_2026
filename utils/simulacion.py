@@ -5,7 +5,6 @@ def _generar_partidos_grupos():
     """Genera los 72 partidos de fase de grupos con datos fijos."""
     partidos = []
     mid = 1
-
     grupos_data = {
         "Group A": [
             ("Mexico",1,1,"Sudafrica","2026-06-11"),("Corea del Sur",2,1,"Republica Checa","2026-06-11"),
@@ -14,7 +13,7 @@ def _generar_partidos_grupos():
         ],
         "Group B": [
             ("Canada",1,3,"Bosnia","2026-06-12"),("Qatar",0,0,"Suiza","2026-06-13"),
-            ("Suiza",1,1,"Bosnia","2026-06-18"),("Canada",1,1,"Qatar","2026-06-18"),
+            ("Suiza",1,1,"Bosnia","2026-06-18"),("Canada",1,0,"Qatar","2026-06-18"),
             ("Suiza",1,0,"Canada","2026-06-24"),("Bosnia",3,1,"Qatar","2026-06-24"),
         ],
         "Group C": [
@@ -63,12 +62,11 @@ def _generar_partidos_grupos():
             ("Colombia",3,2,"Portugal","2026-06-27"),("Congo",0,1,"Uzbekistan","2026-06-27"),
         ],
         "Group L": [
-            ("Inglaterra",0,1,"Croacia","2026-06-17"),("Ghana",0,2,"Panama","2026-06-17"),
-            ("Inglaterra",1,1,"Ghana","2026-06-23"),("Panama",2,3,"Croacia","2026-06-23"),
+            ("Inglaterra",3,1,"Croacia","2026-06-17"),("Ghana",0,2,"Panama","2026-06-17"),
+            ("Inglaterra",1,1,"Ghana","2026-06-23"),("Panama",2,1,"Croacia","2026-06-23"),
             ("Panama",1,2,"Inglaterra","2026-06-27"),("Croacia",1,3,"Ghana","2026-06-27"),
         ],
     }
-
     for grupo, partidos_grupo in grupos_data.items():
         for local, gl, gv, visitante, fecha in partidos_grupo:
             partidos.append({"match_id": mid, "fecha": pd.Timestamp(fecha),
@@ -76,28 +74,25 @@ def _generar_partidos_grupos():
                 "goles_local": gl, "goles_visitante": gv,
                 "penales_local": None, "penales_visitante": None, "estado": "FT"})
             mid += 1
-
     return partidos, mid
-
 
 def _generar_eliminatorias(mid):
     """Genera los partidos de eliminatorias con datos fijos. Todos 1-0."""
     partidos = []
     fecha_e = pd.Timestamp("2026-07-01")
-
     eliminatorias = [
         # 16vos
         ("Republica Checa","Suiza","Round of 32"),("Alemania","Marruecos","Round of 32"),
         ("Japon","Haiti","Round of 32"),("Escocia","Paises Bajos","Round of 32"),
         ("Noruega","Turquia","Round of 32"),("Costa de Marfil","Senegal","Round of 32"),
-        ("Corea del Sur","Arabia Saudita","Round of 32"),("Croacia","Irak","Round of 32"),
+        ("Corea del Sur","Arabia Saudita","Round of 32"),("Inglaterra","Irak","Round of 32"),
         ("Estados Unidos","Jordania","Round of 32"),("Iran","Sudafrica","Round of 32"),
-        ("Congo","Ghana","Round of 32"),("Uruguay","Argelia","Round of 32"),
+        ("Congo","Panama","Round of 32"),("Uruguay","Argelia","Round of 32"),
         ("Bosnia","Belgica","Round of 32"),("Austria","España","Round of 32"),
-        ("Colombia","Inglaterra","Round of 32"),("Australia","Nueva Zelanda","Round of 32"),
+        ("Colombia","Ghana","Round of 32"),("Australia","Nueva Zelanda","Round of 32"),
         # 8vos
         ("Alemania","Noruega","Round of 16"),("Republica Checa","Japon","Round of 16"),
-        ("Escocia","Costa de Marfil","Round of 16"),("Corea del Sur","Croacia","Round of 16"),
+        ("Escocia","Costa de Marfil","Round of 16"),("Corea del Sur","Inglaterra","Round of 16"),
         ("Congo","Uruguay","Round of 16"),("Estados Unidos","Iran","Round of 16"),
         ("Austria","Australia","Round of 16"),("Bosnia","Colombia","Round of 16"),
         # Cuartos
@@ -106,7 +101,6 @@ def _generar_eliminatorias(mid):
         # Semis
         ("Alemania","Congo","Semi-finals"),("Escocia","Austria","Semi-finals"),
     ]
-
     for local, visitante, ronda in eliminatorias:
         partidos.append({"match_id": mid, "fecha": fecha_e,
             "ronda": ronda, "equipo_local": local, "equipo_visitante": visitante,
@@ -114,28 +108,23 @@ def _generar_eliminatorias(mid):
             "penales_local": None, "penales_visitante": None, "estado": "FT"})
         mid += 1
         fecha_e += pd.Timedelta(hours=6)
-
     # 3er puesto
     partidos.append({"match_id": mid, "fecha": pd.Timestamp("2026-07-18"),
         "ronda": "3rd Place", "equipo_local": "Congo", "equipo_visitante": "Austria",
         "goles_local": 1, "goles_visitante": 0,
         "penales_local": None, "penales_visitante": None, "estado": "FT"})
     mid += 1
-
     # Final
     partidos.append({"match_id": mid, "fecha": pd.Timestamp("2026-07-19"),
         "ronda": "Final", "equipo_local": "Alemania", "equipo_visitante": "Escocia",
         "goles_local": 1, "goles_visitante": 0,
         "penales_local": None, "penales_visitante": None, "estado": "FT"})
-
     return partidos
-
 
 @st.cache_data
 def generar_resultados_simulados(fase_hasta="todo"):
     """
     Genera resultados simulados hasta una fase determinada.
-    
     fase_hasta puede ser:
     - "todo": Torneo completo (default)
     - "grupos": Solo fase de grupos
@@ -148,17 +137,14 @@ def generar_resultados_simulados(fase_hasta="todo"):
     partidos_grupos, mid = _generar_partidos_grupos()
     partidos_elim = _generar_eliminatorias(mid)
     todos = partidos_grupos + partidos_elim
-
     if fase_hasta == "nada":
         for p in todos:
             p["estado"] = "NS"
             p["goles_local"] = None
             p["goles_visitante"] = None
         return pd.DataFrame(todos)
-
     if fase_hasta == "todo":
         return pd.DataFrame(todos)
-
     # Mapeo de fases a rondas
     fases_rondas = {
         "grupos": {"Group A","Group B","Group C","Group D","Group E","Group F",
@@ -169,7 +155,6 @@ def generar_resultados_simulados(fase_hasta="todo"):
         "semis": {"Semi-finals"},
         "final": {"Final", "3rd Place"},
     }
-
     # Determinar que rondas estan "jugadas"
     orden_fases = ["grupos", "16vos", "8vos", "4tos", "semis", "final"]
     rondas_jugadas = set()
@@ -177,16 +162,13 @@ def generar_resultados_simulados(fase_hasta="todo"):
         rondas_jugadas |= fases_rondas[fase]
         if fase == fase_hasta:
             break
-
     # Marcar como NS los partidos de rondas no jugadas
     for p in todos:
         if p["ronda"] not in rondas_jugadas:
             p["estado"] = "NS"
             p["goles_local"] = None
             p["goles_visitante"] = None
-
     return pd.DataFrame(todos)
-
 
 def obtener_categorias_reales_simuladas():
     from utils.special_categories import calcular_todas_las_categorias
