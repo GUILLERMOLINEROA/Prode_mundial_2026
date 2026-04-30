@@ -18,6 +18,23 @@ def cargar_css():
 def main():
     cargar_css()
 
+    # Banner de estado API
+    from utils.api_football import obtener_partidos_mundial, _hay_api_key
+    with st.sidebar:
+        if _hay_api_key():
+            api_data = obtener_partidos_mundial()
+            if not api_data.empty:
+                ft = len(api_data[api_data["estado"] == "FT"])
+                ns = len(api_data[api_data["estado"] == "NS"])
+                if ft > 0:
+                    st.success(f"🟢 API EN VIVO — {ft} partidos jugados")
+                else:
+                    st.info(f"🔵 API conectada — {ns} partidos programados")
+            else:
+                st.warning("🟡 API configurada — Sin datos del Mundial 2026 aún")
+        else:
+            st.caption("⚪ Sin API key — Modo simulación")
+
     # Toggle de simulacion y boton de recarga en el sidebar
     with st.sidebar:
         st.markdown("### ⚙️ Configuración")
