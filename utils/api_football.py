@@ -23,14 +23,51 @@ def _hay_api_key():
         return False
 
 # =============================================================================
-# PARTIDOS (Fixtures)
+# ESTADOS DE PARTIDO — MAPEO VISUAL
 # =============================================================================
+ESTADO_DISPLAY = {
+    "NS": ("📅", "Programado"),
+    "1H": ("🔴", "1er Tiempo"),
+    "HT": ("⏸️", "Entretiempo"),
+    "2H": ("🔴", "2do Tiempo"),
+    "ET": ("🔴", "Tiempo Extra"),
+    "BT": ("⏸️", "Break"),
+    "P": ("🔴", "Penales"),
+    "FT": ("✅", "Finalizado"),
+    "AET": ("✅", "Final (prórroga)"),
+    "PEN": ("✅", "Final (penales)"),
+    "SUSP": ("⚠️", "Suspendido"),
+    "INT": ("⚠️", "Interrumpido"),
+    "PST": ("📋", "Postergado"),
+    "CANC": ("❌", "Cancelado"),
+    "ABD": ("❌", "Abandonado"),
+    "AWD": ("⚖️", "Ganador asignado"),
+    "WO": ("⚖️", "Walkover"),
+    "LIVE": ("🔴", "En Vivo"),
+}
 
-@st.cache_data(ttl=1080)  # 18 minutos = 80 refreshes/dia
+ESTADOS_EN_VIVO = {"1H", "2H", "HT", "ET", "BT", "P", "LIVE"}
+ESTADOS_FINALIZADO = {"FT", "AET", "PEN"}
+
+def estado_display(codigo):
+    """Devuelve (emoji, texto) para un código de estado."""
+    return ESTADO_DISPLAY.get(codigo, ("❓", codigo))
+
+def hay_partidos_en_vivo(resultados):
+    """Verifica si hay partidos en curso en un DataFrame de resultados."""
+    if resultados.empty:
+        return False
+    return resultados["estado"].isin(ESTADOS_EN_VIVO).any()
+
+# =============================================================================
+# PARTIDOS (Fixtures) — Cache 1 minuto
+# =============================================================================
+@st.cache_data(ttl=60)
 def obtener_partidos_mundial():
     """
     Obtiene todos los partidos del Mundial 2026 desde la API.
-    Cache de 18 minutos para no exceder el limite de 100 requests/dia.
+    Cache de 1 minuto para actualizaciones en vivo.
+    Con plan Pro (7500 req/dia) esto usa ~4320 req/dia (58%) en el peor caso.
     """
     if not _hay_api_key():
         return pd.DataFrame()
@@ -59,6 +96,7 @@ def obtener_partidos_mundial():
                 "penales_local": fixture["score"]["penalty"]["home"],
                 "penales_visitante": fixture["score"]["penalty"]["away"],
                 "estado": fixture["fixture"]["status"]["short"],
+                "minuto": fixture["fixture"]["status"].get("elapsed"),
             })
         df = pd.DataFrame(partidos)
         if not df.empty:
@@ -70,25 +108,13 @@ def obtener_partidos_mundial():
         return pd.DataFrame()
 
 # =============================================================================
-# STANDINGS (Tabla de posiciones oficial de cada grupo)
-# Esta es la clave para resolver empates raros en fase de grupos.
-# La FIFA resuelve los empates y la API refleja la decision oficial.
+# STANDINGS — Cache 1 minuto
 # =============================================================================
-
-@st.cache_data(ttl=1080)  # 18 minutos
+@st.cache_data(ttl=60)
 def obtener_standings_mundial():
     """
     Obtiene las tablas de posiciones OFICIALES de cada grupo.
-    
-    Esto es CRITICO porque la FIFA resuelve empates por:
-    - Diferencia de goles
-    - Goles a favor
-    - Fair play (tarjetas)
-    - Sorteo
-    
-    La API nos da la tabla ya resuelta, no necesitamos calcularla.
-    
-    Retorna un dict: {grupo: [{equipo, rank, pts, gf, gc, gd, ...}, ...]}
+    La FIFA resuelve empates y la API refleja la decision oficial.
     """
     if not _hay_api_key():
         return {}
@@ -130,42 +156,30 @@ def obtener_standings_mundial():
         st.error(f"Error obteniendo standings: {e}")
         return {}
 
-@st.cache_data(ttl=1080)
+@st.cache_data(ttl=60)
 def obtener_clasificados_por_grupo():
     """
     A partir de los standings oficiales, retorna quienes clasificaron
     en cada grupo (1ero, 2do, y potenciales mejores terceros).
-    
-    Retorna:
-        dict con:
-        - "primeros": {grupo: equipo}
-        - "segundos": {grupo: equipo}
-        - "terceros": {grupo: equipo}
-        - "standings_completos": el dict completo de standings
     """
     standings = obtener_standings_mundial()
     if not standings:
         return {"primeros": {}, "segundos": {}, "terceros": {}, "standings_completos": {}}
-    
     primeros = {}
     segundos = {}
     terceros = {}
-    
     for grupo_nombre, equipos in standings.items():
-        # Mapear nombres de la API a los del Excel
         equipos_mapeados = []
         for eq in equipos:
             eq_copy = eq.copy()
             eq_copy["equipo"] = mapear_nombre_equipo(eq["equipo"])
             equipos_mapeados.append(eq_copy)
-        
         if len(equipos_mapeados) >= 1:
             primeros[grupo_nombre] = equipos_mapeados[0]["equipo"]
         if len(equipos_mapeados) >= 2:
             segundos[grupo_nombre] = equipos_mapeados[1]["equipo"]
         if len(equipos_mapeados) >= 3:
             terceros[grupo_nombre] = equipos_mapeados[2]["equipo"]
-    
     return {
         "primeros": primeros,
         "segundos": segundos,
@@ -174,10 +188,9 @@ def obtener_clasificados_por_grupo():
     }
 
 # =============================================================================
-# GOLEADORES
+# GOLEADORES — Cache 1 minuto
 # =============================================================================
-
-@st.cache_data(ttl=1080)
+@st.cache_data(ttl=60)
 def obtener_goleadores_mundial():
     """Obtiene la tabla de goleadores del Mundial 2026."""
     if not _hay_api_key():
@@ -201,17 +214,13 @@ def obtener_goleadores_mundial():
         return pd.DataFrame()
 
 # =============================================================================
-# ULTIMOS RESULTADOS (para mostrar los 3 mas recientes)
+# ULTIMOS RESULTADOS
 # =============================================================================
-
 def obtener_ultimos_resultados(resultados, cantidad=3):
-    """
-    De un DataFrame de resultados, retorna los ultimos N partidos finalizados.
-    Util para mostrar los resultados mas recientes en la app.
-    """
+    """Retorna los ultimos N partidos finalizados."""
     if resultados.empty:
         return pd.DataFrame()
-    finalizados = resultados[resultados["estado"] == "FT"].copy()
+    finalizados = resultados[resultados["estado"].isin(ESTADOS_FINALIZADO)].copy()
     if finalizados.empty:
         return pd.DataFrame()
     finalizados = finalizados.sort_values("fecha", ascending=False)
@@ -220,7 +229,6 @@ def obtener_ultimos_resultados(resultados, cantidad=3):
 # =============================================================================
 # MAPEO DE NOMBRES Y CLASIFICACION DE RONDAS
 # =============================================================================
-
 def mapear_nombre_equipo(nombre_api):
     """Mapea nombres de la API al formato del Excel."""
     mapeo = {
