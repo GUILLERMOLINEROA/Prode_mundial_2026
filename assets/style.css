@@ -1,0 +1,209 @@
+/* =============================================================================
+   PRODE Mundialista 2026 - Tema personalizado
+   Paleta: Azul oscuro, verde lima, naranja
+   Tipografía: Segoe UI
+   ============================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
+
+/* --- Fuente global --- */
+html, body, p, h1, h2, h3, h4, h5, h6, span, div, td, th, li, label, input, select, textarea, button {
+    font-family: 'Segoe UI', 'Segoe UI Web', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* --- Título principal con efecto verde lima --- */
+.titulo-prode {
+    font-family: 'Russo One', 'Segoe UI', sans-serif !important;
+    font-size: 3rem;
+    text-align: center;
+    background: linear-gradient(90deg, #C8E600, #A8C400, #E8FF30, #C8E600);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: brillo 3s ease-in-out infinite;
+}
+
+@keyframes brillo {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* --- Tarjeta del líder (verde lima brillante) --- */
+.card-lider {
+    background: linear-gradient(135deg, #1B2838, #2C3E50);
+    border: 2px solid #C8E600;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 10px 0;
+    box-shadow: 0 0 20px rgba(200, 230, 0, 0.3);
+    animation: pulso-lider 2s ease-in-out infinite;
+}
+
+@keyframes pulso-lider {
+    0%, 100% { box-shadow: 0 0 20px rgba(200, 230, 0, 0.3); }
+    50% { box-shadow: 0 0 40px rgba(200, 230, 0, 0.6); }
+}
+
+/* --- Tarjeta de los últimos (congelados) --- */
+.card-congelado {
+    background: linear-gradient(135deg, #1B2838, #1a2a3a);
+    border: 2px solid #AEC6CF;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 10px 0;
+    box-shadow: 0 0 15px rgba(174, 198, 207, 0.2);
+    opacity: 0.85;
+}
+
+/* --- Tarjeta normal --- */
+.card-normal {
+    background: linear-gradient(135deg, #1B2838, #2C3E50);
+    border: 1px solid #7C8C8D;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 8px 0;
+}
+
+/* --- Posición en el leaderboard --- */
+.posicion-1 {
+    font-family: 'Russo One', 'Segoe UI', sans-serif !important;
+    font-size: 2rem;
+    color: #C8E600;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(200, 230, 0, 0.5);
+}
+
+.posicion-2 {
+    font-family: 'Segoe UI', sans-serif !important;
+    font-size: 1.8rem;
+    color: #AEC6CF;
+    font-weight: bold;
+}
+
+.posicion-3 {
+    font-family: 'Segoe UI', sans-serif !important;
+    font-size: 1.6rem;
+    color: #E67E22;
+    font-weight: bold;
+}
+
+.posicion-ultima {
+    color: #7C8C8D;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* --- Métrica de puntos grande --- */
+.puntos-grandes {
+    font-family: 'Russo One', 'Segoe UI', sans-serif !important;
+    font-size: 4rem;
+    text-align: center;
+    color: #C8E600;
+    text-shadow: 0 0 20px rgba(200, 230, 0, 0.4);
+}
+
+/* --- Badge de penalidad --- */
+.badge-penalidad {
+    background-color: #E74C3C;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    font-family: 'Segoe UI', sans-serif !important;
+}
+
+/* --- Sidebar --- */
+[data-testid="stSidebar"] {
+    background-color: #1B2838;
+    border-right: 1px solid #2C3E50;
+}
+
+[data-testid="stSidebar"] .stMarkdown {
+    font-family: 'Segoe UI', sans-serif !important;
+}
+
+/* --- Tablas --- */
+.stDataFrame {
+    font-family: 'Segoe UI', sans-serif !important;
+}
+
+/* --- Botones --- */
+.stButton > button {
+    font-family: 'Segoe UI', sans-serif !important;
+    border-color: #C8E600;
+    color: #C8E600;
+}
+
+.stButton > button:hover {
+    background-color: #C8E600;
+    color: #1B2838;
+    border-color: #C8E600;
+}
+
+/* --- Metrics --- */
+[data-testid="stMetricValue"] {
+    font-family: 'Segoe UI', sans-serif !important;
+    color: #FFFFFF;
+}
+
+[data-testid="stMetricLabel"] {
+    font-family: 'Segoe UI', sans-serif !important;
+    color: #AEC6CF;
+}
+
+/* --- Expander --- */
+.streamlit-expanderHeader {
+    font-family: 'Segoe UI', sans-serif !important;
+    color: #AEC6CF;
+}
+
+/* --- Select boxes --- */
+.stSelectbox label, .stMultiSelect label {
+    font-family: 'Segoe UI', sans-serif !important;
+    color: #AEC6CF;
+}
+
+/* --- Toggle --- */
+.stCheckbox label {
+    font-family: 'Segoe UI', sans-serif !important;
+}
+
+/* --- Animación de entrada --- */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Scrollbar personalizado --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1B2838;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #7C8C8D;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #AEC6CF;
+}
+
+/* --- Links --- */
+a {
+    color: #C8E600 !important;
+}
+
+a:hover {
+    color: #E8FF30 !important;
+}

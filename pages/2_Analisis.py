@@ -83,7 +83,7 @@ def main():
         st.markdown(f"### {seleccionado}")
 
     mensaje = obtener_mensaje_posicion(seleccionado, posicion, total_p, puntos)
-    color_borde = "#ff4500" if posicion <= 3 else "#1e90ff" if posicion >= total_p - 2 else "#555"
+    color_borde = "#C8E600" if posicion <= 3 else "#AEC6CF" if posicion >= total_p - 2 else "#555"
     st.markdown(
         f'<div style="background: linear-gradient(135deg, #1a1a2e, #16213e); '
         f'border-left: 4px solid {color_borde}; padding: 20px; '
@@ -146,26 +146,26 @@ def main():
     if primero['participante'] != seleccionado:
         fig.add_trace(go.Scatterpolar(r=vals_primero+[vals_primero[0]], theta=categorias_radar+[categorias_radar[0]],
             fill='toself', name=f"🥇 {primero['participante']}",
-            line_color='#ffd700', fillcolor='rgba(255,215,0,0.1)',
+            line_color='#E8FF30', fillcolor='rgba(232,255,48,0.1)',
             line=dict(width=2, dash='dot')))
     
     # Ultimo (azul hielo, punteado)
     if ultimo['participante'] != seleccionado:
         fig.add_trace(go.Scatterpolar(r=vals_ultimo+[vals_ultimo[0]], theta=categorias_radar+[categorias_radar[0]],
             fill='toself', name=f"💀 {ultimo['participante']}",
-            line_color='#00bfff', fillcolor='rgba(0,191,255,0.05)',
+            line_color='#7C8C8D', fillcolor='rgba(124,140,141,0.05)',
             line=dict(width=2, dash='dot')))
     
     # Participante seleccionado (naranja, prominente)
     fig.add_trace(go.Scatterpolar(r=valores_part+[valores_part[0]], theta=categorias_radar+[categorias_radar[0]],
         fill='toself', name=seleccionado,
-        line_color='#ff4500', fillcolor='rgba(255,69,0,0.3)',
+        line_color='#C8E600', fillcolor='rgba(200,230,0,0.3)',
         line=dict(width=3)))
     
     # Promedio oficina
     fig.add_trace(go.Scatterpolar(r=promedios+[promedios[0]], theta=categorias_radar+[categorias_radar[0]],
         fill='toself', name='Promedio Oficina',
-        line_color='#1e90ff', fillcolor='rgba(30,144,255,0.15)',
+        line_color='#AEC6CF', fillcolor='rgba(174,198,207,0.15)',
         line=dict(width=2)))
     fig.update_layout(polar=dict(bgcolor='rgba(0,0,0,0)',
         radialaxis=dict(visible=True, gridcolor='rgba(255,255,255,0.1)')),

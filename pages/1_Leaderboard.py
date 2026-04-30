@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import os
+import base64
 import json
 
 from utils.excel_reader import cargar_todos_los_participantes
@@ -159,59 +160,100 @@ def mostrar_leaderboard():
     # Top 3
     if not leaderboard.empty:
         st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        # Cargar fotos
-        def foto_participante(nombre):
+        
+        def foto_to_base64(nombre):
             for ext in [".png", ".jpg", ".jpeg"]:
                 path = os.path.join("assets", "fotos", f"{nombre}{ext}")
                 if os.path.exists(path):
-                    return path
-            return None
-
+                    with open(path, "rb") as f:
+                        data = base64.b64encode(f.read()).decode()
+                    return f'<img src="data:image/{ext[1:]};base64,{data}" style="width:70px; border-radius:50%; margin:5px 0;">'
+            return ''
+        
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
             if len(leaderboard) >= 1:
                 l = leaderboard.iloc[0]
-                foto = foto_participante(l["Participante"])
-                st.markdown(f'<div class="card-lider"><p class="posicion-1">🥇 #1</p>', unsafe_allow_html=True)
-                if foto:
-                    st.image(foto, width=80)
-                st.markdown(f'<h2 style="color:#ffd700;">{l["Participante"]}</h2>'
-                    f'<p class="puntos-grandes">{int(l["Total"])}</p>'
-                    f'<p style="color:#aaa;">puntos</p></div>', unsafe_allow_html=True)
+                foto_html = foto_to_base64(l["Participante"])
+                st.markdown(f'''<div class="card-lider" style="text-align:center;">
+                    <p class="posicion-1">🥇 #1</p>
+                    {foto_html}
+                    <h2 style="color:#C8E600; margin:5px 0;">{l["Participante"]}</h2>
+                    <p class="puntos-grandes" style="margin:0;">{int(l["Total"])}</p>
+                    <p style="color:#AEC6CF; margin:0;">puntos</p>
+                </div>''', unsafe_allow_html=True)
+        
         with col2:
             if len(leaderboard) >= 2:
                 s = leaderboard.iloc[1]
-                foto = foto_participante(s["Participante"])
-                st.markdown(f'<div class="card-normal" style="border-color:#c0c0c0;">'
-                    f'<p class="posicion-2">🥈 #2</p>', unsafe_allow_html=True)
-                if foto:
-                    st.image(foto, width=60)
-                st.markdown(f'<h3>{s["Participante"]}</h3>'
-                    f'<h2>{int(s["Total"])} pts</h2></div>', unsafe_allow_html=True)
+                foto_html = foto_to_base64(s["Participante"])
+                st.markdown(f'''<div class="card-normal" style="border-color:#AEC6CF; text-align:center;">
+                    <p class="posicion-2">🥈 #2</p>
+                    {foto_html}
+                    <h3 style="margin:5px 0;">{s["Participante"]}</h3>
+                    <h2 style="margin:0;">{int(s["Total"])} pts</h2>
+                </div>''', unsafe_allow_html=True)
+        
         with col3:
             if len(leaderboard) >= 3:
                 t = leaderboard.iloc[2]
-                foto = foto_participante(t["Participante"])
-                st.markdown(f'<div class="card-normal" style="border-color:#cd7f32;">'
-                    f'<p class="posicion-3">🥉 #3</p>', unsafe_allow_html=True)
-                if foto:
-                    st.image(foto, width=60)
-                st.markdown(f'<h3>{t["Participante"]}</h3>'
-                    f'<h2>{int(t["Total"])} pts</h2></div>', unsafe_allow_html=True)
-
+                foto_html = foto_to_base64(t["Participante"])
+                st.markdown(f'''<div class="card-normal" style="border-color:#E67E22; text-align:center;">
+                    <p class="posicion-3">🥉 #3</p>
+                    {foto_html}
+                    <h3 style="margin:5px 0;">{t["Participante"]}</h3>
+                    <h2 style="margin:0;">{int(t["Total"])} pts</h2>
+                </div>''', unsafe_allow_html=True)
+    
     st.markdown("---")
     st.markdown("### 📋 Tabla Completa")
 
+    # Selector de columnas
+    with st.expander("⚙️ Personalizar columnas", expanded=False):
+        col_a, col_b, col_c, col_d = st.columns(4)
+        with col_a:
+            mostrar_grupos = st.checkbox("Desglose Grupos", value=False)
+        with col_b:
+            mostrar_elim = st.checkbox("Desglose Eliminatorias", value=False)
+        with col_c:
+            mostrar_esp = st.checkbox("Desglose Especiales", value=False)
+        with col_d:
+            mostrar_pen = st.checkbox("Desglose Penalidades", value=False)
+
+    # Construir columnas a mostrar
+    cols_mostrar = ["Posición", "Participante", "Total"]
+    if mostrar_grupos:
+        cols_mostrar.extend(["Grupos L/E/V", "Grupos Exacto"])
+    else:
+        cols_mostrar.append("Grupos")
+    if mostrar_elim:
+        cols_mostrar.extend(["16vos", "8vos", "4tos", "Semis", "Final"])
+    else:
+        cols_mostrar.append("Eliminatorias")
+    cols_mostrar.extend(["Campeón", "3ero"])
+    if mostrar_esp:
+        cols_mostrar.extend(["Figura", "Goleador", "Revelación", "Decepción", "Mejor 1era Fase", "Peor Equipo"])
+    else:
+        cols_mostrar.append("Especiales")
+    if mostrar_pen:
+        cols_mostrar.extend(["Pen. Revelación", "Pen. Campeón", "Pen. Peor Equipo", "Pen. Decepción"])
+    else:
+        cols_mostrar.append("Penalidades")
+
+    cols_mostrar = [c for c in cols_mostrar if c in leaderboard.columns]
+    df_mostrar = leaderboard[cols_mostrar]
+
     def estilizar(row):
         pos = row["Posición"]
-        n = len(leaderboard)
+        n = len(df_mostrar)
         if pos == 1: return ['background-color: rgba(255,69,0,0.3); font-weight:bold'] * len(row)
         elif pos == 2: return ['background-color: rgba(192,192,192,0.15)'] * len(row)
         elif pos == 3: return ['background-color: rgba(205,127,50,0.15)'] * len(row)
         elif pos >= n - 2 and n > 5: return ['background-color: rgba(0,100,200,0.15); font-style:italic'] * len(row)
         return [''] * len(row)
 
-    st.dataframe(leaderboard.style.apply(estilizar, axis=1),
+    st.dataframe(df_mostrar.style.apply(estilizar, axis=1),
         use_container_width=True, hide_index=True,
         height=min(len(leaderboard) * 40 + 60, 700))
 
@@ -220,8 +262,8 @@ def mostrar_leaderboard():
     fig = go.Figure()
     # Construir barras manualmente con base = penalidad
     # Cada participante empieza desde su penalidad (piso negativo)
-    categorias_barras = [("Grupos", "#2ecc71"), ("Eliminatorias", "#3498db"),
-        ("Campeón", "#f1c40f"), ("3ero", "#e67e22"), ("Especiales", "#9b59b6")]
+    categorias_barras = [("Grupos", "#C8E600"), ("Eliminatorias", "#4A90D9"),
+        ("Campeón", "#E67E22"), ("3ero", "#F39C12"), ("Especiales", "#9B59B6")]
     
     # Calcular la base acumulada para cada participante
     for cat_idx, (cat, color) in enumerate(categorias_barras):
@@ -251,7 +293,7 @@ def mostrar_leaderboard():
                 x=row["Participante"], y=pen/2,
                 text=f"<b>{pen}</b>",
                 showarrow=False,
-                font=dict(color="#e74c3c", size=11, family="Arial Black"),
+                font=dict(color="#E74C3C", size=11, family="Arial Black"),
             )
     
     fig.update_layout(barmode="overlay", template="plotly_dark", height=550,

@@ -38,12 +38,12 @@ PUNTOS = {
     "grupos_ganador": 1,
     "grupos_exacto": 1,
     "16vos": 1,
-    "8vos": 4,
-    "4tos": 8,
-    "semis": 15,
-    "final": 25,
+    "8vos": 3,
+    "4tos": 6,
+    "semis": 10,
+    "final": 15,
     "3ero": 5,
-    "campeon": 30,
+    "campeon": 20,
     "Figura": 12,
     "Goleador": 12,
     "Revelación": 12,
@@ -381,32 +381,52 @@ def calcular_puntuacion_total(
 # LEADERBOARD
 # =============================================================================
 
-def generar_leaderboard(todos_los_puntajes: List[Dict]) -> pd.DataFrame:
-    """
-    Genera tabla de posiciones. Desempate: Total → Grupos → Ranking FIFA [1].
-    """
+def generar_leaderboard(todos_los_puntajes):
     datos = []
     for p in todos_los_puntajes:
+        pts_ronda = p.get("pts_por_ronda_elim", {})
+        aciertos = p.get("aciertos_especiales", {})
+        pts_figura = PUNTOS["Figura"] if aciertos.get("Figura", False) else 0
+        pts_goleador = PUNTOS["Goleador"] if aciertos.get("Goleador", False) else 0
+        pts_revelacion_esp = PUNTOS["Revelación"] if aciertos.get("Revelación", False) else 0
+        pts_decepcion_esp = PUNTOS["Decepción"] if aciertos.get("Decepción", False) else 0
+        pts_mejor1era = PUNTOS["Mejor 1era Fase"] if aciertos.get("Mejor 1era Fase", False) else 0
+        pts_peor_esp = PUNTOS["Peor Equipo"] if aciertos.get("Peor Equipo", False) else 0
+        pen_revelacion = 0
+        pen_campeon = 0
+        pen_peor = 0
+        pen_decepcion = 0
+        for r in p.get("razones_penalidad", []):
+            rl = r.lower()
+            if "revelaci" in rl: pen_revelacion = PENALIDADES["revelacion_queda_grupos"]
+            elif "campe" in rl: pen_campeon = PENALIDADES["campeon_no_llega_4tos"]
+            elif "peor" in rl: pen_peor = PENALIDADES["peor_pasa_grupos"]
+            elif "decepc" in rl: pen_decepcion = PENALIDADES["decepcion_llega_semis"]
+        detalle = p.get("detalle_grupos", pd.DataFrame())
+        pts_ganador = 0
+        pts_exacto = 0
+        if isinstance(detalle, pd.DataFrame) and not detalle.empty:
+            jugados = detalle[detalle["estado"] == "jugado"]
+            if not jugados.empty:
+                pts_ganador = int(jugados["acierto_ganador"].sum()) * PUNTOS["grupos_ganador"]
+                pts_exacto = int(jugados["acierto_exacto"].sum()) * PUNTOS["grupos_exacto"]
         datos.append({
-            "Posición": 0,
-            "Participante": p["participante"],
-            "Total": p["total"],
-            "Grupos": p["pts_grupos"],
+            "Posición": 0, "Participante": p["participante"], "Total": p["total"],
+            "Grupos": p["pts_grupos"], "Grupos L/E/V": pts_ganador, "Grupos Exacto": pts_exacto,
             "Eliminatorias": p["pts_eliminatorias"],
-            "Campeón": p["pts_campeon"],
-            "3ero": p["pts_tercero"],
+            "16vos": pts_ronda.get("16vos", 0), "8vos": pts_ronda.get("8vos", 0),
+            "4tos": pts_ronda.get("4tos", 0), "Semis": pts_ronda.get("semis", 0),
+            "Final": pts_ronda.get("final", 0),
+            "3ero": p["pts_tercero"], "Campeón": p["pts_campeon"],
             "Especiales": p["pts_especiales"],
+            "Figura": pts_figura, "Goleador": pts_goleador,
+            "Revelación": pts_revelacion_esp, "Decepción": pts_decepcion_esp,
+            "Mejor 1era Fase": pts_mejor1era, "Peor Equipo": pts_peor_esp,
             "Penalidades": p["pts_penalidades"],
+            "Pen. Revelación": pen_revelacion, "Pen. Campeón": pen_campeon,
+            "Pen. Peor Equipo": pen_peor, "Pen. Decepción": pen_decepcion,
         })
-    
     df = pd.DataFrame(datos)
-    df = df.sort_values(
-        by=["Total", "Grupos"], ascending=[False, False]
-    ).reset_index(drop=True)
+    df = df.sort_values(by=["Total", "Grupos"], ascending=[False, False]).reset_index(drop=True)
     df["Posición"] = range(1, len(df) + 1)
-    
-    cols = [
-        "Posición", "Participante", "Total", "Grupos",
-        "Eliminatorias", "Campeón", "3ero", "Especiales", "Penalidades"
-    ]
-    return df[cols]
+    return df
