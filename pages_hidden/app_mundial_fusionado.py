@@ -72,6 +72,17 @@ def main():
     # =================================================================
     # TITULO
     # =================================================================
+    # Banner
+    banner_path = os.path.join("assets", "banner.png")
+    if os.path.exists(banner_path):
+        with open(banner_path, "rb") as img_b:
+            b64_banner = base64.b64encode(img_b.read()).decode()
+        st.markdown(
+            f'<div style="text-align:center; margin-bottom:20px;">'
+            f'<img src="data:image/png;base64,{b64_banner}" style="max-width:100%; border-radius:10px;">'
+            f'</div>',
+            unsafe_allow_html=True)
+
     st.markdown('<h1 class="titulo-prode">⚽ PRODE MUNDIALISTA 2026 ⚽</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; font-size:1.3rem; color:#aaa;">'
         'Donde las amistades se prueban y los egos se destruyen.</p>', unsafe_allow_html=True)
