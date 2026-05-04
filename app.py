@@ -45,6 +45,20 @@ def comentario_entrega(posicion, total_entregados, nombre):
 cargar_css()
 
 # =============================================================================
+# BANNER
+# =============================================================================
+import base64
+banner_path = os.path.join("assets", "banner.png")
+if os.path.exists(banner_path):
+    with open(banner_path, "rb") as img:
+        b64 = base64.b64encode(img.read()).decode()
+    st.markdown(
+        f'<div style="text-align:center; margin-bottom:20px;">'
+        f'<img src="data:image/png;base64,{b64}" style="max-width:100%; border-radius:10px;">'
+        f'</div>',
+        unsafe_allow_html=True)
+
+# =============================================================================
 # COUNTDOWN
 # =============================================================================
 FECHA_INAUGURAL = datetime(2026, 6, 11, 21, 0, 0, tzinfo=timezone.utc)
@@ -87,6 +101,20 @@ else:
         <p style="color:#C8E600; font-size:2rem;">🔥 ¡EL MUNDIAL YA ARRANCÓ! 🔥</p>
     </div>
     """, unsafe_allow_html=True)
+
+# Recordatorio fecha limite
+FECHA_LIMITE = datetime(2026, 6, 1, 23, 59, 59, tzinfo=timezone.utc)
+delta_limite = FECHA_LIMITE - ahora
+if delta_limite.total_seconds() > 0:
+    dias_limite = delta_limite.days
+    st.markdown(
+        f'<div style="text-align:center; padding:10px; margin-bottom:15px; '
+        f'background:#2C3E50; border:1px solid #E74C3C; border-radius:8px;">'
+        f'<span style="color:#E74C3C; font-size:1rem;">'
+        f'\U0001f4cb Tenés <b>{dias_limite} días</b> para entregar tu PRODE '
+        f'— Fecha límite: <b>1 de junio de 2026</b></span></div>',
+        unsafe_allow_html=True)
+
 
 st.markdown('<h1 class="titulo-prode">🎭 LA PREVIA DEL PRODE 🎭</h1>', unsafe_allow_html=True)
 st.markdown('<p style="text-align:center; font-size:1.3rem; color:#aaa;">'
