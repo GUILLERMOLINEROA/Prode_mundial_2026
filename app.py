@@ -5,11 +5,42 @@ from datetime import datetime, timezone
 
 st.set_page_config(page_title="La Previa - PRODE 2026", page_icon="🎭", layout="wide")
 
+TOTAL_ESPERADO = None  # Se define cuando se cierre la lista
+
 def cargar_css():
     css_path = os.path.join("assets", "style.css")
     if os.path.exists(css_path):
         with open(css_path) as f:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+def cargar_entregas():
+    path = os.path.join("data", "entregas.csv")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    df = pd.read_csv(path)
+    df.columns = df.columns.str.strip()
+    df["codigo"] = df["codigo"].str.strip()
+    return df
+
+def comentario_entrega(posicion, total_entregados, nombre):
+    if posicion == 1:
+        return "El aplicado. Entregó antes que nadie. ¿Ansioso o responsable? El tiempo lo dirá."
+    elif posicion == 2:
+        return "Segundo. No le ganó al primero pero le ganó a todos los demás."
+    elif posicion == 3:
+        return "Podio de la puntualidad. Bronce en responsabilidad."
+    elif posicion == total_entregados and TOTAL_ESPERADO is None:
+        return "Último por ahora... pero todavía faltan muchos. Puede zafar."
+    elif posicion == total_entregados and TOTAL_ESPERADO is not None and total_entregados >= TOTAL_ESPERADO:
+        return "ÚLTIMO. El Excel no se completa solo. Vergüenza máxima."
+    elif posicion <= 5:
+        return "De los primeros. Responsable. O no tenía nada mejor que hacer."
+    elif posicion <= 10:
+        return "Mitad de tabla. Ni muy muy, ni tan tan."
+    elif posicion <= 15:
+        return "Se tomó su tiempo. 'Estaba analizando', dijo. Claro."
+    else:
+        return "Casi último. El Excel lo completó en el Uber."
 
 cargar_css()
 
@@ -17,7 +48,6 @@ cargar_css()
 # COUNTDOWN
 # =============================================================================
 FECHA_INAUGURAL = datetime(2026, 6, 11, 21, 0, 0, tzinfo=timezone.utc)
-
 ahora = datetime.now(timezone.utc)
 delta = FECHA_INAUGURAL - ahora
 
@@ -25,7 +55,6 @@ if delta.total_seconds() > 0:
     dias = delta.days
     horas = delta.seconds // 3600
     minutos = (delta.seconds % 3600) // 60
-
     st.markdown(f"""
     <div style="text-align:center; padding:30px; margin-bottom:20px;
                 background: linear-gradient(135deg, #1B2838 0%, #2C3E50 100%);
@@ -64,7 +93,7 @@ st.markdown('<p style="text-align:center; font-size:1.3rem; color:#aaa;">'
     'El mundial no arrancó, pero las cargadas sí.</p>', unsafe_allow_html=True)
 st.divider()
 
-# --- Cargar datos de los Excels ---
+# --- Cargar datos ---
 from utils.excel_reader import cargar_todos_los_participantes
 from utils.data_loader import foto_participante
 
@@ -74,24 +103,61 @@ if not categorias:
     st.error("No se pudieron cargar los datos de los participantes.")
     st.stop()
 
+entregas = cargar_entregas()
+
 # =============================================================================
 # 1. TABLA DE ENTREGAS
 # =============================================================================
 st.markdown("## 🏅 ¿Quién entregó primero?")
 st.markdown("*La puntualidad dice mucho de una persona. La impuntualidad también.*")
 
-entregas = [
-    {"Orden": "🥇", "Participante": "GELA", "Fecha": "10 abril", "Hora": "08:15", "Veredicto": "El aplicado. Entregó antes que nadie. Sospechoso."},
-    {"Orden": "🥈", "Participante": "JUSO", "Fecha": "12 abril", "Hora": "14:30", "Veredicto": "Responsable. O ansioso. O las dos."},
-    {"Orden": "🥉", "Participante": "AGCR", "Fecha": "15 abril", "Hora": "09:00", "Veredicto": "En el podio de la puntualidad. Bien ahí."},
-    {"Orden": "4", "Participante": "MITU", "Fecha": "18 abril", "Hora": "11:45", "Veredicto": "Justo a tiempo. Ni muy muy, ni tan tan."},
-    {"Orden": "5", "Participante": "FASA", "Fecha": "22 abril", "Hora": "16:20", "Veredicto": "Se tomó su tiempo. 'Estaba analizando', dijo."},
-    {"Orden": "6", "Participante": "PASC", "Fecha": "25 abril", "Hora": "10:00", "Veredicto": "Llegó tarde pero llegó. Como Argentina al segundo tiempo."},
-    {"Orden": "7", "Participante": "MAEG", "Fecha": "28 abril", "Hora": "23:55", "Veredicto": "Casi no llega. Curazao campeón a las 11 de la noche. Dice todo."},
-    {"Orden": "8", "Participante": "ALDO", "Fecha": "29 abril", "Hora": "23:59", "Veredicto": "Último. El Excel lo completó en el Uber. Curazao campeón. Sin palabras."},
-]
-df_entregas = pd.DataFrame(entregas)
-st.dataframe(df_entregas, use_container_width=True, hide_index=True)
+total_entregados = len(entregas)
+# Banner de estado
+st.markdown(
+    f'<div style="text-align:center; padding:12px; background:#1B2838; '
+    f'border:1px solid #C8E600; border-radius:8px; margin-bottom:15px;">'
+    f'<span style="color:#C8E600; font-size:1.1rem;">'
+    f'📋 Entregaron: <b>{total_entregados}</b> '
+    f'| Esperamos entre 25 y 30 participantes</span></div>',
+    unsafe_allow_html=True)
+
+if not entregas.empty:
+    tabla_entregas = []
+    for i, row in entregas.iterrows():
+        pos = i + 1
+        nombre = row["codigo"]
+        fecha = row["fecha"]
+        hora = row["hora"]
+
+        if pos == 1:
+            orden = "🥇"
+        elif pos == 2:
+            orden = "🥈"
+        elif pos == 3:
+            orden = "🥉"
+        else:
+            orden = str(pos)
+
+        veredicto = comentario_entrega(pos, total_entregados, nombre)
+
+        tabla_entregas.append({
+            "Orden": orden,
+            "Participante": nombre,
+            "Fecha": fecha,
+            "Hora": hora,
+            "Veredicto": veredicto,
+        })
+
+    df_entregas = pd.DataFrame(tabla_entregas)
+    st.dataframe(df_entregas, use_container_width=True, hide_index=True)
+
+    st.markdown(
+        '<p style="text-align:center; color:#888; font-style:italic;">'
+        '⏳ Esperamos entre 25 y 30 participantes. '
+        '¿Se habrán olvidado o le tienen miedo al PRODE?</p>',
+        unsafe_allow_html=True)
+else:
+    st.warning("No hay entregas registradas aún.")
 
 # =============================================================================
 # 2. CAMPEONES ELEGIDOS
@@ -101,17 +167,33 @@ st.markdown("## 🏆 ¿A quién le apostaron?")
 st.markdown("*Las elecciones de campeón revelan la personalidad de cada uno.*")
 
 comentarios_campeon_previa = {
-    "Argentina": "🇦🇷 Patriota. Se respeta. Pero solo uno tuvo los huevos de ponerla.",
+    "Argentina": "🇦🇷 VAMOS CARAJO. La Scaloneta no se discute. Patriota de ley.",
     "Alemania": "🇩🇪 Frío, calculador, eficiente. Como un ingeniero alemán. Aburrido pero peligroso.",
     "Ecuador": "🇪🇨 Ecuador campeón. Leíste bien. ECUADOR. La audacia tiene un nombre.",
-    "Curazao": "🇨🇼 CURAZAO. 170.000 habitantes. Clase 4. Este completó el Excel borracho o es un visionario. No hay punto medio.",
+    "Curazao": "🇨🇼 CURAZAO. 170.000 habitantes. Clase 4. Este completó el Excel borracho o es un visionario.",
     "Republica Checa": "🇨🇿 República Checa campeón. Nedved se retiró hace 15 años pero el sueño sigue vivo.",
-    "Costa de Marfil": "🇨🇮 Los Elefantes campeones del mundo. Drogba estaría orgulloso. Lástima que ya se retiró.",
+    "Costa de Marfil": "🇨🇮 Los Elefantes campeones del mundo. Drogba estaría orgulloso.",
     "Argelia": "🇩🇿 Argelia. Si gana, este tipo se tatúa la copa en la frente.",
-    "Brasil": "🇧🇷 Brasil. Clásico. Predecible. Como poner 'empate' en todos los partidos.",
+    "Brasil": "🇧🇷 Brasil. Ir con Brasil siendo argentino es como aplaudir un gol en contra.",
     "Francia": "🇫🇷 Francia. Después de Qatar. Memoria selectiva o masoquismo.",
     "España": "🇪🇸 Tiki-taka. Posesión. Y eliminación en cuartos como siempre.",
-    "Inglaterra": "🏴 TRAIDOR A LA PATRIA DETECTADO.",
+    "Inglaterra": "🏴 TRAIDOR A LA PATRIA DETECTADO. Las Malvinas son argentinas.",
+    "Portugal": "🇵🇹 CR7 con andador. Romántico pero delirante.",
+    "Paises Bajos": "🇳🇱 La naranja mecánica: siempre de novias, nunca de novia.",
+    "Belgica": "🇧🇪 Generación dorada que se oxida sin ganar nada.",
+    "Uruguay": "🇺🇾 Los primos del charco. Garra charrúa con mate y nostalgia.",
+    "Colombia": "🇨🇴 James, Díaz y mucha cumbia. ¿Alcanza?",
+    "Croacia": "🇭🇷 Modric tiene más mundiales encima que años de vida. Guerreros.",
+    "Mexico": "🇲🇽 Algún día van a pasar de octavos. ¿No?",
+    "Estados Unidos": "🇺🇸 Esto no es el Super Bowl, amigo.",
+    "Japon": "🇯🇵 Si el anime enseñó algo es que Japón siempre gana al final.",
+    "Marruecos": "🇲🇦 Los leones del Atlas. ¿Pueden rugir más fuerte?",
+    "Escocia": "🏴 Escocia campeón... y yo soy astronauta.",
+    "Noruega": "🇳🇴 Haaland solo contra el mundo.",
+    "Suiza": "🇨🇭 Neutral en todo, hasta en las apuestas.",
+    "Senegal": "🇸🇳 Los Leones de la Teranga. Valiente apuesta.",
+    "Canada": "🇨🇦 Esto no es hockey sobre hielo, amigo.",
+    "Bosnia": "🇧🇦 Bosnia. Audaz. Inesperado. Tiene huevos.",
 }
 comentario_default = "Una elección... interesante. Guardamos esto para julio."
 
@@ -138,13 +220,16 @@ with col2:
     equipos_unicos = len(campeones)
     st.metric("Equipos distintos elegidos", f"{equipos_unicos} de {total_participantes}")
 
-    if equipos_unicos == total_participantes:
+    if equipos_unicos == 1:
+        unico_campeon = list(campeones.keys())[0]
+        st.success(f"🐑 UNANIMIDAD TOTAL. Todos pusieron **{unico_campeon}**. ¿Se juntaron a completar el Excel o es telepatía?")
+    elif equipos_unicos == total_participantes:
         st.info("🎯 Todos eligieron distinto. Esto va a estar bueno.")
     elif equipos_unicos <= 3:
         st.warning("🐑 Poca originalidad. ¿Se copiaron?")
 
     for campeon, apostadores in campeones.items():
-        if len(apostadores) >= 2:
+        if len(apostadores) >= 2 and len(apostadores) < total_participantes:
             st.warning(f"👯 {' y '.join(apostadores)} coinciden en **{campeon}**. ¿Se mandaron WhatsApp?")
 
 st.divider()
@@ -209,7 +294,10 @@ if not grupos.empty:
 
 argentinistas = [n for n, c in categorias.items() if c.get("Campeon") == "Argentina"]
 with col3:
-    if argentinistas:
+    if len(argentinistas) == total_participantes:
+        st.metric("🇦🇷 Patriotas", f"{len(argentinistas)}/{total_participantes}")
+        st.caption("TODOS. Unanimidad scaloneta. Así se vota.")
+    elif argentinistas:
         st.metric("🇦🇷 Patriotas", len(argentinistas))
         st.caption(f"{', '.join(argentinistas)}. Los únicos con sangre.")
     else:
@@ -315,22 +403,28 @@ for nombre, cats in categorias.items():
     campeon = cats.get("Campeon", "")
     revelacion = cats.get("Revelación", "")
     goleador = cats.get("Goleador", "")
+    decepcion = cats.get("Decepción", "")
 
+    # Campeon clase 4
     if campeon in ["Curazao", "Haiti", "Nueva Zelanda", "Qatar", "Irak", "Jordania", "Cabo Verde", "Uzbekistan", "Congo"]:
         verguenzas.append(f"🤯 **{nombre}** puso a **{campeon}** campeón del mundo. Guardamos esto con llave.")
 
-    if revelacion == campeon and revelacion:
-        verguenzas.append(f"🔄 **{nombre}** puso a **{campeon}** como campeón Y revelación. Si ya es revelación, ¿cómo va a ser campeón? ¿O al revés?")
+    # Revelacion = Campeon
+    if revelacion == campeon and revelacion and "no hay" not in revelacion.lower():
+        verguenzas.append(f"🔄 **{nombre}** puso a **{campeon}** como campeón Y revelación. ¿No se contradice un poco?")
 
-    if goleador and len(goleador) > 1 and goleador[0].islower():
-        verguenzas.append(f"✏️ **{nombre}** escribió '{goleador}' como goleador. ¿Le costaba una mayúscula?")
-
-    if "no hay" in revelacion.lower() or not revelacion:
+    # Sin revelacion
+    if "no hay" in revelacion.lower():
         verguenzas.append(f"🤷 **{nombre}** dice que no hay revelación. Tan pesimista que ni apuesta.")
 
-    # MEssi detector
-    if goleador and any(c.isupper() for c in goleador[1:3]):
-        verguenzas.append(f"⌨️ **{nombre}** escribió '{goleador}'. ¿Caps Lock trabado o es un código secreto?")
+    # Decepcion = equipo fuerte que puso como campeon otro
+    if decepcion and campeon and decepcion == campeon:
+        verguenzas.append(f"🤔 **{nombre}** puso a **{campeon}** como campeón Y decepción. ¿Relación tóxica?")
+
+# Stats globales vergonzosas
+if len(campeones) == 1:
+    unico = list(campeones.keys())[0]
+    verguenzas.append(f"🐑 **TODOS** pusieron a **{unico}**. Cero originalidad. Si pierde en primera ronda, la vergüenza es colectiva.")
 
 if not verguenzas:
     verguenzas.append("Sorprendentemente, nadie hizo nada vergonzoso. Imposible, revisamos de nuevo.")
@@ -343,9 +437,9 @@ for v in verguenzas:
 # =============================================================================
 st.divider()
 st.markdown(
-    '<p style="text-align:center; color:#666; font-size:0.9rem;">'
-    '⏰ El mundial arranca el <b>11 de junio de 2026</b>. '
-    'Hasta entonces, esto es todo lo que hay para sufrir.<br>'
-    'Todas las predicciones fueron guardadas. No hay vuelta atrás. 😈</p>',
+    f'<p style="text-align:center; color:#666; font-size:0.9rem;">'
+    f'⏰ El mundial arranca el <b>11 de junio de 2026</b>. '
+    f'Van <b>{total_entregados}</b> Excels entregados. Esperamos entre 25 y 30 participantes.<br>'
+    f'Todas las predicciones fueron guardadas. No hay vuelta atrás. 😈</p>',
     unsafe_allow_html=True
 )
