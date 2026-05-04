@@ -45,12 +45,25 @@ def comentario_entrega(posicion, total_entregados, nombre):
 cargar_css()
 
 # =============================================================================
-# BANNER
+# =============================================================================
+# BANNER ROTATIVO (cambia cada 5 minutos)
 # =============================================================================
 import base64
-banner_path = os.path.join("assets", "banner.png")
-if os.path.exists(banner_path):
-    with open(banner_path, "rb") as img:
+import glob
+banners_dir = os.path.join("assets", "banners")
+banner_files = sorted(glob.glob(os.path.join(banners_dir, "banner*.png")))
+if not banner_files:
+    # Fallback al banner original
+    banner_path = os.path.join("assets", "banner.png")
+    if os.path.exists(banner_path):
+        banner_files = [banner_path]
+if banner_files:
+    # Rotar cada 10 minutos: todos ven el mismo banner al mismo tiempo
+    from datetime import datetime, timezone
+    _ahora = datetime.now(timezone.utc)
+    idx = ((_ahora.hour * 12) + (_ahora.minute // 5)) % len(banner_files)
+    banner_elegido = banner_files[idx]
+    with open(banner_elegido, "rb") as img:
         b64 = base64.b64encode(img.read()).decode()
     st.markdown(
         f'<div style="text-align:center; margin-bottom:20px;">'
