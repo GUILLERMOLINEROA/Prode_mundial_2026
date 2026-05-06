@@ -33,9 +33,9 @@ def main():
             categorias_reales = calcular_todas_las_categorias(resultados)
             # Agregar overrides manuales
             import json
-            overrides_path = os.path.join("data", "overrides.json")
-            if os.path.exists(overrides_path):
-                with open(overrides_path) as f:
+            overrides_file = overrides_path()
+            if os.path.exists(overrides_file):
+                with open(overrides_file) as f:
                     overrides = json.load(f)
                 for k, v in overrides.items():
                     if v and k in categorias_reales:
@@ -67,7 +67,7 @@ def main():
     # Foto de perfil
     def foto_participante(nombre):
         for ext in [".png", ".jpg", ".jpeg"]:
-            path = os.path.join("assets", "fotos", f"{nombre}{ext}")
+            path = os.path.join(fotos_dir(), f"{nombre}{ext}")
             if os.path.exists(path):
                 return path
         return None

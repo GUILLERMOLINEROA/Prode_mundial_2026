@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime, timezone
+from utils.group_config import entregas_path
 
 st.set_page_config(page_title="La Previa - PRODE 2026", page_icon="🎭", layout="wide")
 
@@ -14,7 +15,7 @@ def cargar_css():
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 def cargar_entregas():
-    path = os.path.join("data", "entregas.csv")
+    path = entregas_path()
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_csv(path)
@@ -58,7 +59,7 @@ if not banner_files:
     if os.path.exists(banner_path):
         banner_files = [banner_path]
 if banner_files:
-    # Rotar cada 10 minutos: todos ven el mismo banner al mismo tiempo
+    # Rotar cada 5 minutos: todos ven el mismo banner al mismo tiempo
     from datetime import datetime, timezone
     _ahora = datetime.now(timezone.utc)
     idx = ((_ahora.hour * 12) + (_ahora.minute // 5)) % len(banner_files)

@@ -27,7 +27,7 @@
 #     según las predicciones del participante
 #
 # Cada participante tiene su propio archivo .xlsm
-# Se leen todos los archivos de la carpeta data/participantes/
+# Se leen todos los archivos de la carpeta del grupo activo: data/groups/{GROUP_ID}/participantes/
 # =============================================================================
 
 import pandas as pd
@@ -36,10 +36,11 @@ import os
 import glob
 from typing import Dict, List, Tuple, Optional, Set
 from utils.normalizar import normalizar_nombre_equipo
+from utils.group_config import participantes_dir
 
 
 # --- Ruta por defecto de la carpeta de participantes ---
-DEFAULT_PARTICIPANTES_DIR = os.path.join("data", "participantes")
+DEFAULT_PARTICIPANTES_DIR = participantes_dir()
 
 # --- Nombres de las pestañas del Excel ---
 HOJA_GRUPOS = "Groups Stage"

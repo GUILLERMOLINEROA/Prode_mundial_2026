@@ -7,10 +7,11 @@ from utils.excel_reader import cargar_todos_los_participantes
 from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
 from utils.special_categories import calcular_todas_las_categorias
+from utils.group_config import overrides_path, fotos_dir
 
 
 def cargar_overrides():
-    path = os.path.join("data", "overrides.json")
+    path = overrides_path()
     if os.path.exists(path):
         with open(path) as f:
             return json.load(f)
@@ -68,7 +69,7 @@ def determinar_campeon_y_tercero(resultados):
 
 def foto_participante(nombre):
     for ext in [".png", ".jpg", ".jpeg"]:
-        path = os.path.join("assets", "fotos", f"{nombre}{ext}")
+        path = os.path.join(fotos_dir(), f"{nombre}{ext}")
         if os.path.exists(path):
             return path
     return None

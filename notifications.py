@@ -28,6 +28,7 @@ logging.getLogger("streamlit").setLevel(logging.ERROR)
 os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
 
 import pandas as pd
+from utils.group_config import participantes_info_path
 
 # =============================================================================
 # CONFIGURACIÓN
@@ -63,7 +64,7 @@ REGLAS ESTRICTAS:
 # =============================================================================
 def cargar_participantes_info():
     """Carga la lista de participantes con emails."""
-    path = os.path.join("data", "participantes_info.csv")
+    path = participantes_info_path()
     participantes = {}
     with open(path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)

@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import os
 import base64
 import random
+from utils.group_config import fotos_dir
 
 st.set_page_config(
     page_title="PRODE Mundial 2026",
@@ -20,7 +21,7 @@ def cargar_css():
 
 def foto_to_base64(nombre):
     for ext in [".png", ".jpg", ".jpeg"]:
-        path = os.path.join("assets", "fotos", f"{nombre}{ext}")
+        path = os.path.join(fotos_dir(), f"{nombre}{ext}")
         if os.path.exists(path):
             with open(path, "rb") as f:
                 data = base64.b64encode(f.read()).decode()

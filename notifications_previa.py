@@ -28,6 +28,7 @@ warnings.filterwarnings("ignore", module="streamlit")
 logging.getLogger("streamlit").setLevel(logging.ERROR)
 
 import pandas as pd
+from utils.group_config import participantes_info_path, entregas_path
 
 EMAIL_USER = os.environ.get("EMAIL_USER", "")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
@@ -71,7 +72,7 @@ CODIGO: comentario
 
 
 def cargar_participantes_info():
-    path = os.path.join("data", "participantes_info.csv")
+    path = participantes_info_path()
     info = {}
     with open(path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -85,7 +86,7 @@ def cargar_participantes_info():
 
 
 def cargar_entregas():
-    path = os.path.join("data", "entregas.csv")
+    path = entregas_path()
     df = pd.read_csv(path)
     df.columns = df.columns.str.strip()
     df["codigo"] = df["codigo"].str.strip()

@@ -10,6 +10,7 @@ from utils.simulacion import generar_resultados_simulados, obtener_categorias_re
 from utils.api_football import mapear_nombre_equipo, clasificar_ronda
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
 from utils.messages import obtener_mensaje_posicion
+from utils.group_config import overrides_path, fotos_dir
 
 st.set_page_config(page_title="Leaderboard", page_icon="🏆", layout="wide")
 
@@ -20,7 +21,7 @@ if os.path.exists(css_path):
 
 def cargar_overrides():
     """Carga overrides manuales desde data/overrides.json"""
-    path = os.path.join("data", "overrides.json")
+    path = overrides_path()
     if os.path.exists(path):
         with open(path) as f:
             return json.load(f)
@@ -163,7 +164,7 @@ def mostrar_leaderboard():
         
         def foto_to_base64(nombre):
             for ext in [".png", ".jpg", ".jpeg"]:
-                path = os.path.join("assets", "fotos", f"{nombre}{ext}")
+                path = os.path.join(fotos_dir(), f"{nombre}{ext}")
                 if os.path.exists(path):
                     with open(path, "rb") as f:
                         data = base64.b64encode(f.read()).decode()
