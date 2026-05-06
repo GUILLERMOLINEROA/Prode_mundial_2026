@@ -77,7 +77,7 @@ def cargar_participantes_info():
 
 
 def obtener_leaderboard():
-    """Calcula el leaderboard actual usando la lógica existente."""
+    """Calcula el leaderboard actual usando la lógica existente. Retorna si usa simulación."""
     from utils.excel_reader import cargar_todos_los_participantes
     from utils.simulacion import generar_resultados_simulados, obtener_categorias_reales_simuladas
     from utils.scoring import calcular_puntuacion_total, generar_leaderboard
@@ -90,6 +90,7 @@ def obtener_leaderboard():
         return pd.DataFrame(), pd.DataFrame(), {}
 
     # Intentar datos reales primero, sino simulación
+    usando_simulacion = False
     try:
         from utils.api_football import obtener_partidos_mundial, mapear_nombre_equipo
         resultados = obtener_partidos_mundial()
@@ -97,8 +98,10 @@ def obtener_leaderboard():
             resultados["equipo_local"] = resultados["equipo_local"].apply(mapear_nombre_equipo)
             resultados["equipo_visitante"] = resultados["equipo_visitante"].apply(mapear_nombre_equipo)
         else:
+            usando_simulacion = True
             resultados = generar_resultados_simulados("todo")
     except Exception:
+        usando_simulacion = True
         resultados = generar_resultados_simulados("todo")
 
     categorias_reales = obtener_categorias_reales_simuladas()
@@ -118,7 +121,7 @@ def obtener_leaderboard():
         todos_puntajes.append(puntaje)
 
     leaderboard = generar_leaderboard(todos_puntajes)
-    return leaderboard, resultados, categorias_todos
+    return leaderboard, resultados, categorias_todos, usando_simulacion
 
 
 def obtener_resultados_recientes(resultados, cantidad=5):
@@ -299,11 +302,21 @@ def main():
     print("  PRODE MUNDIALISTA 2026 — REPORTE SEMANAL")
     print("=" * 60)
 
-    # Modo test: python notifications.py --test email@ejemplo.com
+    # Modos de prueba:
+    #   python notifications.py --test email@ejemplo.com      -> manda 1 mail
+    #   python notifications.py --test-all email@ejemplo.com  -> manda todos los mails a esa casilla
     test_email = None
+    test_all = False
+
     if len(sys.argv) >= 3 and sys.argv[1] == "--test":
         test_email = sys.argv[2]
-        print(f"\n🧪 MODO TEST — Enviando solo a: {test_email}\n")
+        test_all = False
+        print(f"\n🧪 MODO TEST — Enviando solo 1 mail a: {test_email}\n")
+
+    elif len(sys.argv) >= 3 and sys.argv[1] == "--test-all":
+        test_email = sys.argv[2]
+        test_all = True
+        print(f"\n🧪 MODO TEST-ALL — Enviando TODOS los mails a: {test_email}\n")
 
     # 1. Cargar datos
     print("\n1. Cargando participantes...")
@@ -311,11 +324,19 @@ def main():
     print(f"   {len(participantes_info)} participantes con email")
 
     print("\n2. Calculando leaderboard...")
-    leaderboard, resultados, categorias = obtener_leaderboard()
+    leaderboard, resultados, categorias, usando_simulacion = obtener_leaderboard()
 
     if leaderboard.empty:
         print("   ERROR: Leaderboard vacío. Abortando.")
         return
+
+    if usando_simulacion:
+        print("   ⚠️ ATENCIÓN: Se está usando SIMULACIÓN porque no hay datos reales de API.")
+        if not test_email:
+            print("   Envío real abortado para no mandar reportes con datos simulados.")
+            return
+        else:
+            print("   Modo test: se permite usar simulación para validar el diseño del mail.")
 
     print(f"   {len(leaderboard)} participantes en el leaderboard")
 
@@ -389,7 +410,10 @@ def main():
         )
 
         # Enviar
-        asunto = f"⚽ PRODE Semanal — Vas #{posicion} con {puntos} pts"
+        if test_all:
+            asunto = f"[TEST {codigo}] ⚽ PRODE Semanal — Va #{posicion} con {puntos} pts"
+        else:
+            asunto = f"⚽ PRODE Semanal — Vas #{posicion} con {puntos} pts"
         if enviar_email(email, nombre, asunto, html):
             enviados += 1
         else:
@@ -399,8 +423,8 @@ def main():
         if not test_email:
             time.sleep(5)
 
-        # En modo test, solo enviar 1
-        if test_email:
+        # En modo test simple, solo enviar 1. En test-all, enviar todos.
+        if test_email and not test_all:
             break
 
     print(f"\n{'=' * 60}")
