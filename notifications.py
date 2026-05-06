@@ -338,6 +338,17 @@ def main():
         else:
             print("   Modo test: se permite usar simulación para validar el diseño del mail.")
 
+    # Protección adicional:
+    # Si la API tiene fixtures pero todos están programados (NS),
+    # todavía no empezó la competencia. No mandar reporte competitivo.
+    if not usando_simulacion and "estado" in resultados.columns:
+        estados_competencia = {"1H", "2H", "HT", "ET", "P", "LIVE", "FT", "AET", "PEN"}
+        hay_partido_jugado_o_en_vivo = resultados["estado"].isin(estados_competencia).any()
+        if not hay_partido_jugado_o_en_vivo:
+            print("   ⚠️ API disponible, pero todavía no hay partidos jugados/en vivo.")
+            print("   Envío competitivo abortado hasta que empiece el Mundial.")
+            return
+
     print(f"   {len(leaderboard)} participantes en el leaderboard")
 
     # 3. Obtener resultados recientes

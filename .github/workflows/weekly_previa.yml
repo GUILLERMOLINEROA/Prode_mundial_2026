@@ -1,13 +1,13 @@
-name: PRODE - Reporte Semanal
+name: PRODE - Reporte Semanal de Previa
 
 on:
   schedule:
-    # Lunes 9:15 AM Argentina (ART = UTC-3, entonces 12:15 UTC)
-    - cron: '15 12 * * 1'
-  workflow_dispatch:  # Permite correrlo manualmente desde GitHub
+    # Lunes 9:00 AM Argentina (ART = UTC-3, entonces 12:00 UTC)
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
 
 jobs:
-  enviar-reportes:
+  enviar-reporte-previa:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,10 +22,9 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Enviar reportes semanales
+      - name: Enviar reporte semanal de previa
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-        run: python notifications.py
+        run: python notifications_previa.py
