@@ -213,10 +213,11 @@ if not entregas.empty:
     df_entregas = pd.DataFrame(tabla_entregas)
     st.dataframe(df_entregas, use_container_width=True, hide_index=True)
 
+    footer_txt = bienvenida_data.get("footer", "")
+    if not footer_txt:
+        footer_txt = f'Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes. ¿Se habrán olvidado o le tienen miedo al PRODE?'
     st.markdown(
-        '<p style="text-align:center; color:#888; font-style:italic;">'
-        f'⏳ Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes. '
-        f'¿Se habrán olvidado o le tienen miedo al PRODE?</p>',
+        f'<p style="text-align:center; color:#888; font-style:italic;">⏳ {footer_txt}</p>',
         unsafe_allow_html=True)
 else:
     st.warning("No hay entregas registradas aún.")
