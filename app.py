@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime, timezone
-from utils.group_config import entregas_path
+from utils.group_config import entregas_path, banners_dir, group_config
 
 st.set_page_config(page_title="La Previa - PRODE 2026", page_icon="🎭", layout="wide")
 
@@ -51,8 +51,8 @@ cargar_css()
 # =============================================================================
 import base64
 import glob
-banners_dir = banners_dir()
-banner_files = sorted(glob.glob(os.path.join(banners_dir, "banner*.png")))
+banners_folder = banners_dir()
+banner_files = sorted(glob.glob(os.path.join(banners_folder, "banner*.png")))
 if not banner_files:
     # Fallback al banner original
     banner_path = os.path.join("assets", "banner.png")
@@ -148,6 +148,26 @@ if not categorias:
 entregas = cargar_entregas()
 
 # =============================================================================
+# COMENTARIO DE BIENVENIDA (Gemini, cacheado cada 3 horas)
+# =============================================================================
+bienvenida_data = {"bienvenida": "", "footer": ""}
+try:
+    from utils.bienvenida import obtener_bienvenida
+    bienvenida_data = obtener_bienvenida(categorias_todos=categorias)
+    bienvenida_txt = bienvenida_data.get("bienvenida", "")
+    if bienvenida_txt:
+        st.markdown(
+            f'<div style="text-align:center; padding:15px 25px; margin:10px 0; '
+            f'background:linear-gradient(135deg, #1B2838, #2C3E50); '
+            f'border-left:3px solid #C8E600; border-radius:8px;">'
+            f'<p style="color:#AEC6CF; font-size:1rem; margin:0; line-height:1.6; font-style:italic;">'
+            f'💬 {bienvenida_txt}</p></div>',
+            unsafe_allow_html=True)
+except Exception:
+    pass
+
+
+# =============================================================================
 # 1. TABLA DE ENTREGAS
 # =============================================================================
 st.markdown("## 🏅 ¿Quién entregó primero?")
@@ -160,7 +180,7 @@ st.markdown(
     f'border:1px solid #C8E600; border-radius:8px; margin-bottom:15px;">'
     f'<span style="color:#C8E600; font-size:1.1rem;">'
     f'📋 Entregaron: <b>{total_entregados}</b> '
-    f'| Esperamos entre 25 y 30 participantes</span></div>',
+    f'| Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes</span></div>',
     unsafe_allow_html=True)
 
 if not entregas.empty:
@@ -195,8 +215,8 @@ if not entregas.empty:
 
     st.markdown(
         '<p style="text-align:center; color:#888; font-style:italic;">'
-        '⏳ Esperamos entre 25 y 30 participantes. '
-        '¿Se habrán olvidado o le tienen miedo al PRODE?</p>',
+        f'⏳ Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes. '
+        f'¿Se habrán olvidado o le tienen miedo al PRODE?</p>',
         unsafe_allow_html=True)
 else:
     st.warning("No hay entregas registradas aún.")
@@ -481,7 +501,7 @@ st.divider()
 st.markdown(
     f'<p style="text-align:center; color:#666; font-size:0.9rem;">'
     f'⏰ El mundial arranca el <b>11 de junio de 2026</b>. '
-    f'Van <b>{total_entregados}</b> Excels entregados. Esperamos entre 25 y 30 participantes.<br>'
+    f'Van <b>{total_entregados}</b> Excels entregados. Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes.<br>'
     f'Todas las predicciones fueron guardadas. No hay vuelta atrás. 😈</p>',
     unsafe_allow_html=True
 )
