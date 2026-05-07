@@ -41,6 +41,7 @@ def generar_bienvenida_previa(
     esperados_min,
     esperados_max,
     participantes_data,
+    entregas_data,
     tono_prompt,
     seed_hora,
 ):
@@ -53,6 +54,18 @@ def generar_bienvenida_previa(
     # Seleccionar 2-3 participantes aleatorios para mencionar
     rng = random.Random(seed_hora)
     mencionados = rng.sample(participantes_list, min(3, len(participantes_list)))
+
+    # Construir texto de entregas
+    entregas_list = [dict(e) for e in entregas_data] if entregas_data else []
+    entregas_txt = ""
+    for i, e in enumerate(entregas_list):
+        entregas_txt += f"- #{i+1} {e.get('codigo','?')} (entregó {e.get('fecha','?')} a las {e.get('hora','?')})"
+        # Buscar campeon en participantes
+        for p in participantes_list:
+            if p.get('codigo') == e.get('codigo'):
+                entregas_txt += f" — Campeón: {p.get('campeon','?')}"
+                break
+        entregas_txt += "\n"
 
     menciones_txt = ""
     for p in mencionados:
@@ -74,28 +87,48 @@ Contexto actual:
 Participantes para mencionar (elegí 2 o 3 y hacé comentarios sobre sus apuestas):
 {menciones_txt}
 
-Generá DOS textos separados por la línea "---":
+Orden de entrega (quién entregó primero y quién último):
+{entregas_txt}
+
+Generá TRES textos separados por la línea "---":
 
 1. BIENVENIDA: Un párrafo de bienvenida (3-4 oraciones) que hable de cuánto falta, cuántos entregaron, y tire cargadas a los participantes mencionados.
 
 2. FOOTER: Una oración corta y picante sobre los que todavía no entregaron el Excel (faltan {max(esperados_min - total_entregados, 0)} a {max(esperados_max - total_entregados, 0)}).
+
+3. VEREDICTOS: Un comentario corto y picante (1 oración) para CADA participante que entregó, basándote en su orden de entrega, su campeón y sus apuestas. Formato exacto:
+CODIGO: comentario
 """
 
     texto = _llamar_gemini(prompt)
     if not texto:
         return _fallback_previa(dias_para_mundial, total_entregados, esperados_min, esperados_max)
 
-    # Separar bienvenida y footer
+    # Separar bienvenida, footer y veredictos
     partes = texto.split("---")
     bienvenida = partes[0].strip() if len(partes) >= 1 else ""
     footer = partes[1].strip() if len(partes) >= 2 else ""
+    veredictos_raw = partes[2].strip() if len(partes) >= 3 else ""
 
     # Limpiar etiquetas
-    for tag in ["BIENVENIDA:", "1.", "2.", "FOOTER:", "1)", "2)"]:
+    for tag in ["BIENVENIDA:", "1.", "2.", "3.", "FOOTER:", "VEREDICTOS:", "1)", "2)", "3)"]:
         bienvenida = bienvenida.replace(tag, "").strip()
         footer = footer.replace(tag, "").strip()
 
-    return {"bienvenida": bienvenida, "footer": footer}
+    # Parsear veredictos
+    veredictos = {}
+    for linea in veredictos_raw.split("\n"):
+        linea = linea.strip()
+        if ":" in linea and len(linea) > 3:
+            cod, com = linea.split(":", 1)
+            cod = cod.strip().upper()
+            # Limpiar numeración si quedó
+            for tag in ["1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10.", "- "]:
+                cod = cod.replace(tag, "").strip()
+            if cod and com.strip():
+                veredictos[cod] = com.strip()
+
+    return {"bienvenida": bienvenida, "footer": footer, "veredictos": veredictos}
 
 
 @st.cache_data(ttl=GEMINI_CACHE_TTL)
@@ -146,6 +179,7 @@ def _fallback_previa(dias, entregados, esp_min, esp_max):
     """Comentario de fallback si Gemini no está disponible."""
     faltan = max(esp_min - entregados, 0)
     return {
+        "veredictos": {},
         "bienvenida": f"⏰ Faltan {dias} días para el Mundial 2026. Ya entregaron {entregados} valientes. ¿El resto? Seguramente todavía están googleando quién juega en el grupo de la muerte.",
         "footer": f"⏳ Esperamos entre {esp_min} y {esp_max} participantes. Faltan {faltan}+ vagos por entregar.",
     }
@@ -163,8 +197,8 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
     esp_max = config.get("participantes_esperados_max", 30)
 
     ahora = datetime.now(timezone.utc)
-    fecha_str = ahora.strftime("%d/%m/%Y %H:%M UTC")
-    seed_hora = ahora.hour // 3  # Cambia cada 3 horas
+    seed_hora = ahora.hour // 3
+    fecha_str = ahora.strftime("%d/%m/%Y") + f" (bloque {seed_hora})"  # Cambia cada 3 horas
 
     fecha_inaugural = datetime(2026, 6, 11, tzinfo=timezone.utc)
     dias_para_mundial = (fecha_inaugural - ahora).days
@@ -226,9 +260,26 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
         if not participantes_data:
             return _fallback_previa(dias_para_mundial, 0, esp_min, esp_max)
 
+        # Preparar datos de entregas
+        entregas_info = []
+        try:
+            import pandas as pd
+            from utils.group_config import entregas_path
+            edf = pd.read_csv(entregas_path())
+            edf.columns = edf.columns.str.strip()
+            for _, row in edf.iterrows():
+                entregas_info.append({
+                    "codigo": str(row["codigo"]).strip(),
+                    "fecha": str(row["fecha"]).strip(),
+                    "hora": str(row["hora"]).strip(),
+                })
+        except Exception:
+            pass
+
         return generar_bienvenida_previa(
             fecha_str, dias_para_mundial, len(participantes_data),
             esp_min, esp_max, tuple(tuple(sorted(p.items())) for p in participantes_data),
+            tuple(tuple(sorted(e.items())) for e in entregas_info),
             tono, seed_hora,
         )
 

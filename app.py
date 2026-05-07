@@ -200,7 +200,11 @@ if not entregas.empty:
         else:
             orden = str(pos)
 
-        veredicto = comentario_entrega(pos, total_entregados, nombre)
+        # Usar veredicto de Gemini si existe, sino fallback estático
+        veredictos_gemini = bienvenida_data.get("veredictos", {})
+        veredicto = veredictos_gemini.get(nombre, "")
+        if not veredicto:
+            veredicto = comentario_entrega(pos, total_entregados, nombre)
 
         tabla_entregas.append({
             "Orden": orden,
