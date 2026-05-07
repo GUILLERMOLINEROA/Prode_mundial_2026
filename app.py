@@ -51,7 +51,7 @@ cargar_css()
 # =============================================================================
 import base64
 import glob
-banners_dir = os.path.join("assets", "banners")
+banners_dir = banners_dir()
 banner_files = sorted(glob.glob(os.path.join(banners_dir, "banner*.png")))
 if not banner_files:
     # Fallback al banner original

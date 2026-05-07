@@ -28,7 +28,7 @@ logging.getLogger("streamlit").setLevel(logging.ERROR)
 os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
 
 import pandas as pd
-from utils.group_config import participantes_info_path
+from utils.group_config import participantes_info_path, group_config
 
 # =============================================================================
 # CONFIGURACIÓN
@@ -44,20 +44,28 @@ SMTP_PORT = 587
 # =============================================================================
 # PROMPT PARA GEMINI
 # =============================================================================
-SYSTEM_PROMPT = """Sos un analista de fútbol argentino, cínico, sarcástico y con humor negro.
-Tu estilo es el de un hincha de café que sabe de fútbol pero se burla de todo el mundo.
+def get_system_prompt():
+    """Genera el prompt de competencia basado en el config del grupo."""
+    config = group_config()
+    tono_base = config.get("prompt_gemini", "Sos un analista de fútbol argentino, sarcástico y con humor. Máximo 3 oraciones.")
+
+    return f"""{tono_base}
+
 Usás jerga argentina: "papá", "crack", "mufa", "colgado", "se comió los mocos", "está en el horno",
 "la pegó", "está en llamas", "vendió humo", etc.
 
-REGLAS ESTRICTAS:
-- Máximo 3 oraciones.
+Instrucciones:
 - Si le va bien: alabalo con ironía, como que no te lo esperabas.
-- Si le va mal: humillalo amistosamente, como un amigo que te carga.
+- Si le va mal: humillalo, como un amigo que te carga.
 - Si está en el medio: decile que es invisible, que nadie se acuerda de él.
-- NUNCA uses insultos fuertes, racismo, sexismo ni nada ofensivo.
-- NUNCA menciones temas fuera del fútbol o el PRODE.
 - Siempre terminá con algo que duela pero con cariño.
+- No menciones temas fuera del fútbol o el PRODE.
+
+Formato exacto (una linea por participante):
+CODIGO: comentario
 """
+
+SYSTEM_PROMPT = get_system_prompt()
 
 # =============================================================================
 # FUNCIONES

@@ -28,7 +28,7 @@ warnings.filterwarnings("ignore", module="streamlit")
 logging.getLogger("streamlit").setLevel(logging.ERROR)
 
 import pandas as pd
-from utils.group_config import participantes_info_path, entregas_path
+from utils.group_config import participantes_info_path, entregas_path, group_config
 
 EMAIL_USER = os.environ.get("EMAIL_USER", "")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
@@ -40,35 +40,35 @@ SMTP_PORT = 587
 ESTIMADO_MIN = 25
 ESTIMADO_MAX = 30
 
-SYSTEM_PROMPT_PREVIA = """Sos el cronista oficial de la PREVIA de un PRODE mundialista de oficina argentina.
+def get_system_prompt_previa():
+    """Genera el prompt de previa basado en el config del grupo."""
+    config = group_config()
+    tono_base = config.get("prompt_gemini", "Sos un analista de fútbol argentino, sarcástico y con humor. Máximo 3 oraciones.")
+
+    return f"""{tono_base}
 
 Tu tarea es generar comentarios personalizados para cada participante basándote en:
 - orden de entrega
 - campeón elegido
-- goleador
-- figura
-- revelación
-- decepción
+- goleador, figura, revelación, decepción
 - goles totales predichos
 
-Tono:
-- sarcástico, futbolero argentino, gracioso y picante
-- cargada amistosa de oficina
+Instrucciones adicionales:
 - si entregó primero, cargalo por aplicado/ansioso
 - si va último por ahora, cargalo pero aclarando que todavía puede zafar
 - si puso Argentina campeón, celebralo como patriota
 - si puso muchos goles, decile que vino a ver básquet
 - si puso pocos goles, decile catenaccio/Mourinho
-- máximo 3 oraciones por participante
 
 Reglas:
-- No insultos fuertes
-- No temas personales sensibles
 - No inventes datos
 - No racismo/sexismo/discriminación
-- Formato exacto:
+- Formato exacto (una linea por participante):
 CODIGO: comentario
 """
+
+SYSTEM_PROMPT_PREVIA = get_system_prompt_previa()
+
 
 
 def cargar_participantes_info():

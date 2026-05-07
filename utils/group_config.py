@@ -63,3 +63,33 @@ def fotos_dir(group_id=None):
 
 def group_exists(group_id=None):
     return os.path.exists(group_base_path(group_id))
+
+
+def group_config():
+    """Lee el config.json del grupo activo."""
+    import json
+    path = group_file("config.json")
+    defaults = {
+        "nombre_display": "PRODE Mundialista 2026",
+        "tono": "picante",
+        "prompt_gemini": "Sos un analista de fútbol argentino, sarcástico y con humor. Máximo 3 oraciones.",
+        "banners_propios": False,
+    }
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                config = json.load(f)
+                defaults.update(config)
+            except Exception:
+                pass
+    return defaults
+
+
+def banners_dir():
+    """Retorna la carpeta de banners del grupo si tiene propios, sino la global."""
+    config = group_config()
+    if config.get("banners_propios"):
+        group_banners = os.path.join(group_base_path(), "banners")
+        if os.path.exists(group_banners) and os.listdir(group_banners):
+            return group_banners
+    return os.path.join("assets", "banners")
