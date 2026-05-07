@@ -308,11 +308,16 @@ def main():
     #   python notifications.py --test-all email@ejemplo.com  -> manda todos los mails a esa casilla
     test_email = None
     test_all = False
+    test_code = None
 
     if len(sys.argv) >= 3 and sys.argv[1] == "--test":
         test_email = sys.argv[2]
         test_all = False
-        print(f"\n🧪 MODO TEST — Enviando solo 1 mail a: {test_email}\n")
+        if len(sys.argv) >= 5 and sys.argv[3] == "--code":
+            test_code = sys.argv[4].upper()
+            print(f"\n🧪 MODO TEST — Enviando mail de {test_code} a: {test_email}\n")
+        else:
+            print(f"\n🧪 MODO TEST — Enviando solo 1 mail a: {test_email}\n")
 
     elif len(sys.argv) >= 3 and sys.argv[1] == "--test-all":
         test_email = sys.argv[2]
@@ -400,6 +405,9 @@ def main():
         if test_email:
             email = test_email
 
+        if test_code and codigo != test_code:
+            continue
+
         print(f"\n  --- {codigo} ({nombre}) ---")
 
         # Usar comentario pre-generado por Gemini (batch) o fallback
@@ -436,7 +444,9 @@ def main():
             time.sleep(5)
 
         # En modo test simple, solo enviar 1. En test-all, enviar todos.
-        if test_email and not test_all:
+        if test_email and not test_all and not test_code:
+            break
+        if test_email and test_code and codigo == test_code:
             break
 
     print(f"\n{'=' * 60}")
