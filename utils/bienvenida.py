@@ -92,7 +92,7 @@ Orden de entrega (quién entregó primero y quién último):
 
 Generá TRES textos separados por la línea "---":
 
-1. BIENVENIDA: Un párrafo de bienvenida (3-4 oraciones) que hable de cuánto falta, cuántos entregaron, y tire cargadas a los participantes mencionados.
+1. BIENVENIDA: Un párrafo LARGO y jugoso de bienvenida (MÍNIMO 4-5 oraciones, puede ser más) que hable de cuánto falta para el mundial, cuántos entregaron, tire cargadas a los participantes mencionados, se burle de sus apuestas, y genere hype. Este texto tiene que ser el más largo y completo de todos. NO lo hagas corto.
 
 2. FOOTER: Una oración corta y picante sobre los que todavía no entregaron el Excel (faltan {max(esperados_min - total_entregados, 0)} a {max(esperados_max - total_entregados, 0)}).
 
