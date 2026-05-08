@@ -271,7 +271,7 @@ def enviar_email(destinatario, nombre, asunto, html_body, nombre_display):
 # URLs de las apps por grupo
 APP_URLS = {
     "oficina": "https://fpm2026oficina.streamlit.app",
-    "losamigosesos": "https://losamigosesos2026.streamlit.app",
+    "losamigosesos": "https://fpm2026losamigosesos.streamlit.app",
 }
 
 
