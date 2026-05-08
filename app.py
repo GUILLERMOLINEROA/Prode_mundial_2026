@@ -441,24 +441,30 @@ if not grupos.empty:
             pct = round(100 * matches / total) if total > 0 else 0
             coincidencias.append({"Pareja": f"{p1} vs {p2}", "Coincidencias": matches, "De": total, "%": pct})
 
-    df_coin = pd.DataFrame(coincidencias).sort_values("%", ascending=False)
+    if not coincidencias:
+        st.markdown(
+            '<p style="text-align:center; color:#E74C3C; font-style:italic; font-size:1.1rem;">'
+            '⏳ Con un solo Excel cargado no hay con quién comparar.<br>'
+            'Cuando algún pajúo más entregue el suyo, acá van a aparecer las coincidencias sospechosas.</p>',
+            unsafe_allow_html=True)
+    else:
+        df_coin = pd.DataFrame(coincidencias).sort_values("%", ascending=False)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("### 👯 Más parecidos")
-        for _, row in df_coin.head(3).iterrows():
-            emoji = "🚨" if row["%"] > 70 else "👀"
-            st.markdown(f"{emoji} **{row['Pareja']}**: {row['%']}% coincidencia ({row['Coincidencias']}/{row['De']})")
-            if row["%"] > 70:
-                st.caption("¿Se copiaron? ¿Compartieron Excel? Investigación en curso.")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("### 👯 Más parecidos")
+            for _, row in df_coin.head(3).iterrows():
+                emoji = "🚨" if row["%"] > 70 else "👀"
+                st.markdown(f"{emoji} **{row['Pareja']}**: {row['%']}% coincidencia ({row['Coincidencias']}/{row['De']})")
+                if row["%"] > 70:
+                    st.caption("¿Se copiaron? ¿Compartieron Excel? Investigación en curso.")
 
-    with col2:
-        st.markdown("### ⚔️ Más distintos")
-        for _, row in df_coin.tail(3).iterrows():
-            st.markdown(f"🔥 **{row['Pareja']}**: {row['%']}% coincidencia ({row['Coincidencias']}/{row['De']})")
-        st.caption("Estos dos no coinciden ni en el día de la semana.")
+        with col2:
+            st.markdown("### ⚔️ Más distintos")
+            for _, row in df_coin.tail(3).iterrows():
+                st.markdown(f"🔥 **{row['Pareja']}**: {row['%']}% coincidencia ({row['Coincidencias']}/{row['De']})")
+            st.caption("Estos dos no coinciden ni en el día de la semana.")
 
-# =============================================================================
 # 5. MURO DE LA VERGÜENZA
 # =============================================================================
 st.divider()
