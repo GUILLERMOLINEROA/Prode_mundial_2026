@@ -98,17 +98,21 @@ Generá TRES textos separados por la línea "---":
 
 3. VEREDICTOS: Un comentario corto y picante (1 oración) para CADA participante que entregó, basándote en su orden de entrega, su campeón y sus apuestas. Formato exacto:
 CODIGO: comentario
+
+4. DELIRIOS: Un comentario cortito y jugoso (1-2 oraciones) para CADA participante sobre sus apuestas (campeón, goleador, revelación, decepción). No repitas lo del veredicto, acá concentrate en burlarte de sus elecciones futbolísticas. Formato exacto:
+CODIGO: comentario
 """
 
     texto = _llamar_gemini(prompt)
     if not texto:
         return _fallback_previa(dias_para_mundial, total_entregados, esperados_min, esperados_max)
 
-    # Separar bienvenida, footer y veredictos
+    # Separar bienvenida, footer, veredictos y delirios
     partes = texto.split("---")
     bienvenida = partes[0].strip() if len(partes) >= 1 else ""
     footer = partes[1].strip() if len(partes) >= 2 else ""
     veredictos_raw = partes[2].strip() if len(partes) >= 3 else ""
+    delirios_raw = partes[3].strip() if len(partes) >= 4 else ""
 
     # Limpiar etiquetas
     for tag in ["BIENVENIDA:", "1.", "2.", "3.", "FOOTER:", "VEREDICTOS:", "1)", "2)", "3)"]:
@@ -128,7 +132,19 @@ CODIGO: comentario
             if cod and com.strip():
                 veredictos[cod] = com.strip()
 
-    return {"bienvenida": bienvenida, "footer": footer, "veredictos": veredictos}
+    # Parsear delirios
+    delirios = {}
+    for linea in delirios_raw.split("\n"):
+        linea = linea.strip()
+        if ":" in linea and len(linea) > 3:
+            cod, com = linea.split(":", 1)
+            cod = cod.strip().upper()
+            for tag in ["1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10.", "- ", "4."]:
+                cod = cod.replace(tag, "").strip()
+            if cod and com.strip():
+                delirios[cod] = com.strip()
+
+    return {"bienvenida": bienvenida, "footer": footer, "veredictos": veredictos, "delirios": delirios}
 
 
 @st.cache_data(ttl=GEMINI_CACHE_TTL)
@@ -180,6 +196,7 @@ def _fallback_previa(dias, entregados, esp_min, esp_max):
     faltan = max(esp_min - entregados, 0)
     return {
         "veredictos": {},
+        "delirios": {},
         "bienvenida": f"⏰ Faltan {dias} días para el Mundial 2026. Ya entregaron {entregados} valientes. ¿El resto? Seguramente todavía están googleando quién juega en el grupo de la muerte.",
         "footer": f"⏳ Esperamos entre {esp_min} y {esp_max} participantes. Faltan {faltan}+ vagos por entregar.",
     }

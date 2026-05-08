@@ -309,7 +309,9 @@ for nombre, cats in sorted(categorias.items()):
     revelacion = cats.get("Revelación", "?")
     decepcion = cats.get("Decepción", "?")
 
-    comentario = comentarios_campeon_previa.get(campeon, comentario_default)
+    # Usar delirio de Gemini si existe, sino fallback al diccionario
+    delirios = bienvenida_data.get("delirios", {}) if bienvenida_data else {}
+    comentario = delirios.get(nombre, "") or comentarios_campeon_previa.get(campeon, comentario_default)
     foto = foto_participante(nombre)
 
     with st.container():
