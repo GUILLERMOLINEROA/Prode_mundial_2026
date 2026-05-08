@@ -47,16 +47,22 @@ def cargar_banner_url(group_id):
     return f"https://raw.githubusercontent.com/GUILLERMOLINEROA/Prode_mundial_2026/main/data/groups/{group_id}/banners/banner1_email.jpg"
 
 
-def generar_html(nombre, banner_url, config, group_id, app_url):
+def generar_html(nombre, banner_url, config, group_id, app_url, participantes):
     nombre_display = config.get("nombre_display", f"PRODE {group_id}")
     tono = config.get("tono", "normal")
 
     if tono == "ultra_picante":
         saludo = f"Epa <b>{nombre}</b>, ¿qué más pana?"
+        nombres_todos = [pp["nombre"] for pp in participantes]
+        if len(nombres_todos) > 1:
+            lista_nombres = ", ".join(nombres_todos[:-1]) + " y " + nombres_todos[-1]
+        else:
+            lista_nombres = nombres_todos[0] if nombres_todos else "nadie"
         intro = (
             f"Esto es oficial: el <b style='color:#C8E600;'>{nombre_display}</b> está en marcha, "
-            "marico. Sí, así como lo lees. Vamos a ver quién de este grupo de pajúos "
-            "sabe de verdad de fútbol y quién solo sabe hablar paja."
+            f"marico. Sí, así como lo lees. Somos {len(nombres_todos)} pajúos en esta vaina: "
+            f"<b>{lista_nombres}</b>. "
+            "Vamos a ver quién de este grupo sabe de verdad de fútbol y quién solo sabe hablar paja."
         )
         que_es_titulo = "🤔 ¿QUÉ VERGA ES UN PRODE?"
         que_es_texto = (
@@ -308,7 +314,7 @@ def main():
     enviados = 0
     for p in participantes:
         email = test_email if test_email else p["email"]
-        html = generar_html(p["nombre"], banner_url, config, group_id, app_url)
+        html = generar_html(p["nombre"], banner_url, config, group_id, app_url, participantes)
 
         if enviar_email(email, p["nombre"], asunto, html, nombre_display):
             enviados += 1
