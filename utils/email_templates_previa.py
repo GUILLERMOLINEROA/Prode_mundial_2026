@@ -159,8 +159,7 @@ def generar_html_email_previa(
             <div style="background:#0D1117; padding:15px 25px; text-align:center; border-top:1px solid #2C3E50;">
                 <p style="color:#7C8C8D; font-size:12px; margin:0;">
                     Fabuloso Prode Mundialista 2026 — Oficina<br>
-                    <a href="https://fpm2026oficina.streamlit.app" style="color:#C8E600; text-decoration:none;">
-                        Ver La Previa</a>
+                    <span style="color:#C8E600;">Si llegaste hasta acá leyendo, ya sos más dedicado que la mitad de los participantes.</span>
                 </p>
             </div>
         </div>
