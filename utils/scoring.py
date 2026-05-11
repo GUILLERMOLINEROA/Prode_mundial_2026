@@ -2,23 +2,20 @@
 # utils/scoring.py
 # Módulo central de puntuación del PRODE Mundial 2026.
 #
-# Máximo teórico: 577 puntos [1]
-#
-# FASE DE GRUPOS (máx 240):
-#   - Ganador: 1 pto × 104 partidos (NOTA: son 72 partidos de grupos,
-#     pero el Excel dice 104 como máximo. Verificar con reglas finales.)
+# FASE DE GRUPOS:
+#   - Ganador del partido: 1 pto
 #   - Resultado exacto: 1 pto adicional
 #
-# ELIMINATORIAS (máx 273):
-#   - 16vos: 1 pto × equipo (máx 32)
-#   - 8vos: 4 pts × equipo (máx 64)
-#   - 4tos: 8 pts × equipo (máx 64)  
-#   - Semis: 15 pts × equipo (máx 60)
-#   - Final: 25 pts × equipo (máx 50)
-#   - 3ero: 5 pts
-#   - Campeón: 30 pts
+# ELIMINATORIAS (por equipo predicho que efectivamente llega a esa fase):
+#   - 16vos: 1 pto
+#   - 8vos: 3 pts
+#   - 4tos: 6 pts
+#   - Semis: 10 pts
+#   - Final: 15 pts
+#   - 3er puesto: 5 pts
+#   - Campeón: 20 pts
 #
-# ESPECIALES (máx 64):
+# ESPECIALES:
 #   Figura, Goleador, Revelación, Decepción: 12 c/u
 #   Mejor 1era Fase, Peor Equipo: 8 c/u
 #
