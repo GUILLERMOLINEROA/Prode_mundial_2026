@@ -76,6 +76,18 @@ def generar_bienvenida_previa(
             f"Revelación={p.get('revelacion','?')}\n"
         )
 
+    # Lista completa de TODOS los participantes (para DELIRIOS)
+    todos_txt = ""
+    for p in participantes_list:
+        todos_txt += (
+            f"- {p.get('nombre', p.get('codigo','?'))} ({p.get('codigo','?')}): "
+            f"Campeón={p.get('campeon','?')}, "
+            f"Goleador={p.get('goleador','?')}, "
+            f"Figura={p.get('figura','?')}, "
+            f"Revelación={p.get('revelacion','?')}, "
+            f"Decepción={p.get('decepcion','?')}\n"
+        )
+
     prompt = f"""{tono_prompt}
 
 Contexto actual:
@@ -99,7 +111,12 @@ Generá TRES textos separados por la línea "---":
 3. VEREDICTOS: Un comentario corto y picante (1 oración) para CADA participante que entregó, basándote en su orden de entrega, su campeón y sus apuestas. Formato exacto:
 CODIGO: comentario
 
-4. DELIRIOS: Un comentario cortito y jugoso (1-2 oraciones) para CADA participante sobre sus apuestas (campeón, goleador, revelación, decepción). No repitas lo del veredicto, acá concentrate en burlarte de sus elecciones futbolísticas. Formato exacto:
+4. DELIRIOS: Un comentario cortito y jugoso (1-2 oraciones) para CADA UNO de los siguientes participantes sobre sus apuestas. No repitas lo del veredicto, acá concentrate en burlarte de sus elecciones futbolísticas.
+
+Lista COMPLETA de participantes y sus apuestas (generá un delirio para CADA UNO, no te saltees ninguno):
+{todos_txt}
+
+Formato exacto:
 CODIGO: comentario
 """
 
@@ -271,7 +288,9 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
                     "nombre": codigo,
                     "campeon": cats.get("Campeon", "?"),
                     "goleador": cats.get("Goleador", "?"),
+                    "figura": cats.get("Figura", "?"),
                     "revelacion": cats.get("Revelación", "?"),
+                    "decepcion": cats.get("Decepción", "?"),
                 })
 
         if not participantes_data:
