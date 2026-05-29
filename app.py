@@ -104,7 +104,7 @@ if delta.total_seconds() > 0:
             </div>
         </div>
         <p style="color:#888; font-size:0.9rem; margin-top:10px;">
-            🏟️ México vs Sudáfrica — 11 de junio de 2026</p>
+            🏟️ México vs Sudáfrica — 18 de junio de 2026</p>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -117,7 +117,7 @@ else:
     """, unsafe_allow_html=True)
 
 # Recordatorio fecha limite
-FECHA_LIMITE = datetime(2026, 6, 1, 23, 59, 59, tzinfo=timezone.utc)
+FECHA_LIMITE = datetime(2026, 6, 8, 23, 59, 59, tzinfo=timezone.utc)
 delta_limite = FECHA_LIMITE - ahora
 if delta_limite.total_seconds() > 0:
     dias_limite = delta_limite.days
@@ -126,7 +126,7 @@ if delta_limite.total_seconds() > 0:
         f'background:#2C3E50; border:1px solid #E74C3C; border-radius:8px;">'
         f'<span style="color:#E74C3C; font-size:1rem;">'
         f'\U0001f4cb Tenés <b>{dias_limite} días</b> para entregar tu PRODE '
-        f'— Fecha límite: <b>1 de junio de 2026</b></span></div>',
+        f'— Fecha límite: <b>8 de junio de 2026</b></span></div>',
         unsafe_allow_html=True)
 
 
@@ -513,7 +513,7 @@ for v in verguenzas:
 st.divider()
 st.markdown(
     f'<p style="text-align:center; color:#666; font-size:0.9rem;">'
-    f'⏰ El mundial arranca el <b>11 de junio de 2026</b>. '
+    f'⏰ El mundial arranca el <b>18 de junio de 2026</b>. '
     f'Van <b>{total_entregados}</b> Excels entregados. Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes.<br>'
     f'Todas las predicciones fueron guardadas. No hay vuelta atrás. 😈</p>',
     unsafe_allow_html=True
