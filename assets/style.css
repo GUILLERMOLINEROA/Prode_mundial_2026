@@ -210,4 +210,4 @@ a:hover {
 
 /* Ocultar boton de GitHub y menu de Streamlit */
 .stMainMenu {display: none;}
-header [data-testid="stToolbar"] {display: none;}
+header [data-testid="stToolbar"] {display: flex !important;}

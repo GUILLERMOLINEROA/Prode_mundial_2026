@@ -168,12 +168,18 @@ def obtener_clasificados_por_grupo():
     primeros = {}
     segundos = {}
     terceros = {}
+    ranking_terceros = []
     for grupo_nombre, equipos in standings.items():
         equipos_mapeados = []
         for eq in equipos:
             eq_copy = eq.copy()
             eq_copy["equipo"] = mapear_nombre_equipo(eq["equipo"])
             equipos_mapeados.append(eq_copy)
+        grupo_lower = str(grupo_nombre).lower()
+        if "third-placed" in grupo_lower or "ranking of third" in grupo_lower:
+            ranking_terceros = equipos_mapeados
+            continue
+
         if len(equipos_mapeados) >= 1:
             primeros[grupo_nombre] = equipos_mapeados[0]["equipo"]
         if len(equipos_mapeados) >= 2:
@@ -184,6 +190,7 @@ def obtener_clasificados_por_grupo():
         "primeros": primeros,
         "segundos": segundos,
         "terceros": terceros,
+        "ranking_terceros": ranking_terceros,
         "standings_completos": standings,
     }
 

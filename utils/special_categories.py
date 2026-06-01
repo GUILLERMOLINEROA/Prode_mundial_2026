@@ -77,6 +77,8 @@ def calcular_tabla_grupos(resultados):
         tabla[visitante]["gf"] += gv
         tabla[visitante]["gc"] += gl
     datos = list(tabla.values())
+    if not datos:
+        return pd.DataFrame()
     for d in datos:
         d["dg"] = d["gf"] - d["gc"]
     return pd.DataFrame(datos).sort_values(by=["pts", "dg", "gf"], ascending=[False, False, False])
