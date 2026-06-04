@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 import os
 import base64
 import random
+from utils.participantes_info import cargar_participantes_info
+from utils.comentarios_campeon import comentario_campeon_contextual
 from utils.group_config import fotos_dir
 
 st.set_page_config(
@@ -304,6 +306,7 @@ def main():
     if "categorias_todos" in st.session_state:
         with st.expander("🎭 Los Apostadores y sus Delirios", expanded=False):
             categorias_todos = st.session_state.get("categorias_todos", {})
+            participantes_info_map = cargar_participantes_info()
             comentarios_campeon = {
                 "Argentina": "Obvio, papá. ¿Quién no va con la Scaloneta?",
                 "Brasil": "Ir con Brasil siendo argentino es como aplaudir un gol en contra. Traidor.",
@@ -339,7 +342,8 @@ def main():
 
             for i, (nombre, cats) in enumerate(sorted(categorias_todos.items()), 1):
                 camp = cats.get("Campeon", "No definido")
-                comentario = comentarios_campeon.get(camp, "")
+                nacionalidad = participantes_info_map.get(nombre, {}).get("nacionalidad", "")
+                comentario = comentario_campeon_contextual(nombre, camp, nacionalidad) or comentarios_campeon.get(camp, "")
                 if not comentario:
                     random.seed(hash(nombre + camp))
                     comentario = random.choice(comentario_default_list)

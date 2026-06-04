@@ -1,17 +1,16 @@
-codigo,nombre,email
-FASA,Facundo Salas,fasa@topsoe.com
-JVAR,Javier Valera,jvar@topsoe.com
-GELA,Guillermo Linero,gela@topsoe.com
-AGCR,Agustin Cravino,agcr@topsoe.com
-SIAF,Silvina Arangio,siaf@topsoe.com
-LSUR,Luis Suriano,lsur@topsoe.com
-FLVI,Flor Vitelleschi,flvi@topsoe.com
-FMSC,Federico Scholz,fmsc@topsoe.com
-ALME,Alejandra Medrano,alme@topsoe.com
-FEDE,Federico Gómez,federicogomez0042@gmail.com
-MITU,Miguel Tutera,mitu@topsoe.com
-LUSO,Luis Orozco,luso@topsoe.com
-REPP,Rommel Pernia,repp@topsoe.com
-ROSI,Rosa Maria,insaurralderosamaria@gmail.com
-FEDA,Felipe da Costa,feda@topsoe.com
-
+codigo,nombre,email,nacionalidad
+FASA,Facundo Salas,fasa@topsoe.com,Argentino
+JVAR,Javier Valera,jvar@topsoe.com,Argentino
+GELA,Guillermo Linero,gela@topsoe.com,Argentino y Venezolano
+AGCR,Agustin Cravino,agcr@topsoe.com,Argentino
+SIAF,Silvina Arangio,siaf@topsoe.com,Argentino
+LSUR,Luis Suriano,lsur@topsoe.com,Mexicano
+FLVI,Flor Vitelleschi,flvi@topsoe.com,Argentino
+FMSC,Federico Scholz,fmsc@topsoe.com,Argentino
+ALME,Alejandra Medrano,alme@topsoe.com,Argentino
+FEDE,Federico Gómez,federicogomez0042@gmail.com,Argentino
+MITU,Miguel Tutera,mitu@topsoe.com,Argentino
+LUSO,Luis Orozco,luso@topsoe.com,Mexicano
+REPP,Rommel Pernia,repp@topsoe.com,Venezolano
+ROSI,Rosa Maria,insaurralderosamaria@gmail.com,Argentino
+FEDA,Felipe da Costa,feda@topsoe.com,Brasilero
