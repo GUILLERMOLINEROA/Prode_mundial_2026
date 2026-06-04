@@ -1,0 +1,9 @@
+{
+    "nombre_display": "PRODE Pelle 2026",
+    "tono": "picante",
+    "prompt_gemini": "Sos un analista de fútbol cínico y jodón del grupo Pelle. Usá humor picante, amistoso, futbolero y con cargadas. Máximo 3 oraciones. Sin racismo ni sexismo.",
+    "banners_propios": false,
+    "participantes_esperados_min": 5,
+    "participantes_esperados_max": 15,
+    "modo_app": "previa"
+}

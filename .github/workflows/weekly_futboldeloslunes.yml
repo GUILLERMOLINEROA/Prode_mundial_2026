@@ -1,0 +1,31 @@
+name: PRODE - Reporte Semanal PRODE Fútbol de los Lunes 2026
+
+on:
+  schedule:
+    - cron: '15 16 * * 1'
+  workflow_dispatch:
+
+jobs:
+  enviar-reportes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Enviar reportes semanales
+        env:
+          GROUP_ID: futboldeloslunes
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: python notifications.py
