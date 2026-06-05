@@ -60,14 +60,14 @@ def hay_partidos_en_vivo(resultados):
     return resultados["estado"].isin(ESTADOS_EN_VIVO).any()
 
 # =============================================================================
-# PARTIDOS (Fixtures) — Cache 1 minuto
+# PARTIDOS (Fixtures) — Cache 3 minutos
 # =============================================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=180)
 def obtener_partidos_mundial():
     """
     Obtiene todos los partidos del Mundial 2026 desde la API.
-    Cache de 1 minuto para actualizaciones en vivo.
-    Con plan Pro (7500 req/dia) esto usa ~4320 req/dia (58%) en el peor caso.
+    Cache de 3 minutos para actualizaciones en vivo.
+    Con plan Pro (7500 req/dia) esto usa ~1440 req/dia (19%) en el peor caso.
     """
     if not _hay_api_key():
         return pd.DataFrame()
@@ -108,9 +108,9 @@ def obtener_partidos_mundial():
         return pd.DataFrame()
 
 # =============================================================================
-# STANDINGS — Cache 1 minuto
+# STANDINGS — Cache 3 minutos
 # =============================================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=180)
 def obtener_standings_mundial():
     """
     Obtiene las tablas de posiciones OFICIALES de cada grupo.
@@ -156,7 +156,7 @@ def obtener_standings_mundial():
         st.error(f"Error obteniendo standings: {e}")
         return {}
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=180)
 def obtener_clasificados_por_grupo():
     """
     A partir de los standings oficiales, retorna quienes clasificaron
@@ -195,9 +195,9 @@ def obtener_clasificados_por_grupo():
     }
 
 # =============================================================================
-# GOLEADORES — Cache 1 minuto
+# GOLEADORES — Cache 3 minutos
 # =============================================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=180)
 def obtener_goleadores_mundial():
     """Obtiene la tabla de goleadores del Mundial 2026."""
     if not _hay_api_key():
