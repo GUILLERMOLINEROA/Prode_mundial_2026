@@ -104,7 +104,7 @@ if delta.total_seconds() > 0:
             </div>
         </div>
         <p style="color:#888; font-size:0.9rem; margin-top:10px;">
-            🏟️ México vs Sudáfrica — 18 de junio de 2026</p>
+            🏟️ México vs Sudáfrica — 11 de junio de 2026</p>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -513,7 +513,7 @@ for v in verguenzas:
 st.divider()
 st.markdown(
     f'<p style="text-align:center; color:#666; font-size:0.9rem;">'
-    f'⏰ El mundial arranca el <b>18 de junio de 2026</b>. '
+    f'⏰ El mundial arranca el <b>11 de junio de 2026</b>. '
     f'Van <b>{total_entregados}</b> Excels entregados. Esperamos entre {group_config().get("participantes_esperados_min", 25)} y {group_config().get("participantes_esperados_max", 30)} participantes.<br>'
     f'Todas las predicciones fueron guardadas. No hay vuelta atrás. 😈</p>',
     unsafe_allow_html=True
