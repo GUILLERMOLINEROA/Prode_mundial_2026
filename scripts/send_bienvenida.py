@@ -316,7 +316,10 @@ def main():
 
     enviados = 0
     for p in participantes:
-        email = test_email if test_email else p["email"]
+        email = test_email if test_email else (p.get("email") or "").strip()
+        if not email and not test_email:
+            print(f"  [SKIP] {p.get('codigo', '?')} no tiene email cargado")
+            continue
         html = generar_html(p["nombre"], banner_url, config, group_id, app_url, participantes)
 
         if enviar_email(email, p["nombre"], asunto, html, nombre_display):

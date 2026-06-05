@@ -319,7 +319,10 @@ def main():
             continue
 
         nombre = info["nombre"]
-        email = info["email"]
+        email = (info.get("email") or "").strip()
+        if not email and not test_email:
+            print(f"  [SKIP] {codigo} no tiene email cargado")
+            continue
         if test_email:
             email = test_email
 
