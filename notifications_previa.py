@@ -276,6 +276,37 @@ def main():
         test_all = True
         print(f"\n🧪 MODO TEST-ALL — Enviando TODOS los mails a: {test_email}\n")
 
+    # Protección: si el grupo ya está en modo mundial, no mandar mails de previa
+    cfg = group_config()
+    modo_app = str(cfg.get("modo_app", "previa")).strip().lower()
+    if modo_app != "previa":
+        print("   ⚠️ Este grupo ya no está en modo previa.")
+        print("   Envío de mails de previa abortado.")
+        return
+
+    # Protección por fecha global de inicio del Mundial
+    from datetime import datetime, timezone
+    fecha_inaugural = datetime(2026, 6, 11, 0, 0, 0, tzinfo=timezone.utc)
+    ahora = datetime.now(timezone.utc)
+    if ahora >= fecha_inaugural:
+        print("   ⚠️ Ya empezó (o ya debería haber empezado) el Mundial.")
+        print("   Envío de mails de previa abortado.")
+        return
+
+    # Protección adicional: si la API ya tiene partidos reales o en vivo, abortar
+    try:
+        from utils.api_football import obtener_partidos_mundial
+        resultados_api = obtener_partidos_mundial()
+        if resultados_api is not None and not resultados_api.empty and "estado" in resultados_api.columns:
+            estados_competencia = {"1H", "2H", "HT", "ET", "P", "LIVE", "FT", "AET", "PEN"}
+            hay_partido_real = resultados_api["estado"].isin(estados_competencia).any()
+            if hay_partido_real:
+                print("   ⚠️ La API ya tiene partidos reales/en vivo.")
+                print("   Envío de mails de previa abortado.")
+                return
+    except Exception as e:
+        print(f"   [INFO] No se pudo validar API real para previa: {e}")
+
     print("\n1. Cargando datos...")
     participantes_info = cargar_participantes_info()
     entregas = cargar_entregas()
