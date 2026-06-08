@@ -8,7 +8,7 @@ import random
 import streamlit as st
 from datetime import datetime, timezone
 
-GEMINI_CACHE_TTL = 10800  # 3 horas en segundos
+GEMINI_CACHE_TTL = 43200  # 3 horas en segundos
 
 
 def _get_gemini_key():
