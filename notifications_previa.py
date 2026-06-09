@@ -278,6 +278,10 @@ def main():
 
     # Protección: si el grupo ya está en modo mundial, no mandar mails de previa
     cfg = group_config()
+    if not cfg.get("emails_activos", True):
+        print("   ℹ️ Este grupo tiene emails_activos=false.")
+        print("   No se envían mails automáticos para este grupo.")
+        return
     modo_app = str(cfg.get("modo_app", "previa")).strip().lower()
     if modo_app != "previa":
         print("   ⚠️ Este grupo ya no está en modo previa.")
