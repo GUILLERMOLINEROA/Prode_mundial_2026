@@ -343,23 +343,51 @@ st.markdown("*Números que nadie pidió pero todos necesitan.*")
 col1, col2, col3, col4 = st.columns(4)
 
 if not grupos.empty:
-    goles_por_participante = {}
+    goles_grupos = {}
     for p in grupos["participante"].unique():
         sub = grupos[grupos["participante"] == p]
-        gl = sub["goles_local_pred"].sum()
-        gv = sub["goles_visitante_pred"].sum()
-        goles_por_participante[p] = int(gl + gv)
+        gl = sub["goles_local_pred"].fillna(0).sum()
+        gv = sub["goles_visitante_pred"].fillna(0).sum()
+        goles_grupos[p] = int(gl + gv)
 
-    mas_goles = max(goles_por_participante, key=goles_por_participante.get)
-    menos_goles = min(goles_por_participante, key=goles_por_participante.get)
+    goles_elim = {}
+    if elim is not None and not elim.empty:
+        for p in elim["participante"].unique():
+            sub = elim[elim["participante"] == p]
+            g1 = sub["goles1_pred"].fillna(0).sum()
+            g2 = sub["goles2_pred"].fillna(0).sum()
+            goles_elim[p] = int(g1 + g2)
+
+    participantes_goles = sorted(set(list(goles_grupos.keys()) + list(goles_elim.keys())))
+    goles_totales = {
+        p: goles_grupos.get(p, 0) + goles_elim.get(p, 0)
+        for p in participantes_goles
+    }
+
+    mas_goles_grupos = max(goles_grupos, key=goles_grupos.get)
+    menos_goles_grupos = min(goles_grupos, key=goles_grupos.get)
 
     with col1:
-        st.metric("🔥 El Goleador", mas_goles, f"{goles_por_participante[mas_goles]} goles")
-        st.caption("Predice más goles que nadie. Optimista o ingenuo.")
+        st.metric("🔥 El Goleador (fase de grupos)", mas_goles_grupos, f"{goles_grupos[mas_goles_grupos]} goles")
+        st.caption("Predice más goles que nadie en la fase de grupos.")
 
     with col2:
-        st.metric("🧱 El Catenaccio", menos_goles, f"{goles_por_participante[menos_goles]} goles")
-        st.caption("Para este el fútbol se juega 0-0 y penales.")
+        st.metric("🧱 El Catenaccio (fase de grupos)", menos_goles_grupos, f"{goles_grupos[menos_goles_grupos]} goles")
+        st.caption("Para este el fútbol se juega 0-0 y penales en la fase de grupos.")
+
+    st.markdown("### ⚽ En total")
+    t1, t2 = st.columns(2)
+
+    mas_goles_total = max(goles_totales, key=goles_totales.get)
+    menos_goles_total = min(goles_totales, key=goles_totales.get)
+
+    with t1:
+        st.metric("🚀 El Más Goleador (total)", mas_goles_total, f"{goles_totales[mas_goles_total]} goles")
+        st.caption("Contando fase de grupos + eliminatorias predichas.")
+
+    with t2:
+        st.metric("🪖 El Más Amarrete (total)", menos_goles_total, f"{goles_totales[menos_goles_total]} goles")
+        st.caption("Contando fase de grupos + eliminatorias predichas.")
 
 argentinistas = [n for n, c in categorias.items() if c.get("Campeon") == "Argentina"]
 with col3:
