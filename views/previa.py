@@ -502,38 +502,45 @@ st.markdown("## 🧱 El Muro de la Vergüenza")
 st.markdown("*Predicciones que van a envejecer MUY mal. Guardamos todo para julio.*")
 
 verguenzas = []
-for nombre, cats in categorias.items():
-    campeon = cats.get("Campeon", "")
-    revelacion = cats.get("Revelación", "")
-    goleador = cats.get("Goleador", "")
-    decepcion = cats.get("Decepción", "")
 
-    # Campeon clase 4
-    if campeon in ["Curazao", "Haiti", "Nueva Zelanda", "Qatar", "Irak", "Jordania", "Cabo Verde", "Uzbekistan", "Congo"]:
-        verguenzas.append(f"🤯 **{nombre}** puso a **{campeon}** campeón del mundo. Guardamos esto con llave.")
+# Si Gemini generó muro, usarlo
+muro_gemini = bienvenida_data.get("muro", []) if bienvenida_data else []
+if muro_gemini:
+    for v in muro_gemini:
+        st.markdown(f"🤡 {v}")
+else:
+    for nombre, cats in categorias.items():
+        campeon = cats.get("Campeon", "")
+        revelacion = cats.get("Revelación", "")
+        goleador = cats.get("Goleador", "")
+        decepcion = cats.get("Decepción", "")
 
-    # Revelacion = Campeon
-    if revelacion == campeon and revelacion and "no hay" not in revelacion.lower():
-        verguenzas.append(f"🔄 **{nombre}** puso a **{campeon}** como campeón Y revelación. ¿No se contradice un poco?")
+        # Campeon clase 4
+        if campeon in ["Curazao", "Haiti", "Nueva Zelanda", "Qatar", "Irak", "Jordania", "Cabo Verde", "Uzbekistan", "Congo"]:
+            verguenzas.append(f"🤯 **{nombre}** puso a **{campeon}** campeón del mundo. Guardamos esto con llave.")
 
-    # Sin revelacion
-    if "no hay" in revelacion.lower():
-        verguenzas.append(f"🤷 **{nombre}** dice que no hay revelación. Tan pesimista que ni apuesta.")
+        # Revelacion = Campeon
+        if revelacion == campeon and revelacion and "no hay" not in revelacion.lower():
+            verguenzas.append(f"🔄 **{nombre}** puso a **{campeon}** como campeón Y revelación. ¿No se contradice un poco?")
 
-    # Decepcion = equipo fuerte que puso como campeon otro
-    if decepcion and campeon and decepcion == campeon:
-        verguenzas.append(f"🤔 **{nombre}** puso a **{campeon}** como campeón Y decepción. ¿Relación tóxica?")
+        # Sin revelacion
+        if "no hay" in revelacion.lower():
+            verguenzas.append(f"🤷 **{nombre}** dice que no hay revelación. Tan pesimista que ni apuesta.")
 
-# Stats globales vergonzosas
-if len(campeones) == 1:
-    unico = list(campeones.keys())[0]
-    verguenzas.append(f"🐑 **TODOS** pusieron a **{unico}**. Cero originalidad. Si pierde en primera ronda, la vergüenza es colectiva.")
+        # Decepcion = equipo fuerte que puso como campeon otro
+        if decepcion and campeon and decepcion == campeon:
+            verguenzas.append(f"🤔 **{nombre}** puso a **{campeon}** como campeón Y decepción. ¿Relación tóxica?")
 
-if not verguenzas:
-    verguenzas.append("Sorprendentemente, nadie hizo nada vergonzoso. Imposible, revisamos de nuevo.")
+    # Stats globales vergonzosas
+    if len(campeones) == 1:
+        unico = list(campeones.keys())[0]
+        verguenzas.append(f"🐑 **TODOS** pusieron a **{unico}**. Cero originalidad. Si pierde en primera ronda, la vergüenza es colectiva.")
 
-for v in verguenzas:
-    st.markdown(v)
+    if not verguenzas:
+        verguenzas.append("Sorprendentemente, nadie hizo nada vergonzoso. Imposible, revisamos de nuevo.")
+
+    for v in verguenzas:
+        st.markdown(v)
 
 # =============================================================================
 # FOOTER

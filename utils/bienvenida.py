@@ -88,6 +88,35 @@ def generar_bienvenida_previa(
             f"Decepción={p.get('decepcion','?')}\n"
         )
 
+    # Candidatos al muro de la vergüenza
+    muro_candidatos_txt = ""
+    equipos_falopa = {"Curazao", "Haiti", "Nueva Zelanda", "Qatar", "Irak", "Jordania", "Cabo Verde", "Uzbekistan", "Congo"}
+
+    for p in participantes_list:
+        codigo = p.get("codigo", "?")
+        campeon = str(p.get("campeon", ""))
+        revelacion = str(p.get("revelacion", ""))
+        goleador = str(p.get("goleador", ""))
+        decepcion = str(p.get("decepcion", ""))
+
+        if campeon in equipos_falopa:
+            muro_candidatos_txt += f"- {codigo}: puso a {campeon} campeón del mundo.\\n"
+
+        if revelacion and revelacion.lower() == "no hay revelación":
+            muro_candidatos_txt += f"- {codigo}: dice que no hay revelación.\\n"
+
+        if revelacion and campeon and revelacion == campeon and "no hay" not in revelacion.lower():
+            muro_candidatos_txt += f"- {codigo}: puso a {campeon} como campeón y revelación.\\n"
+
+        if decepcion and campeon and decepcion == campeon:
+            muro_candidatos_txt += f"- {codigo}: puso a {campeon} como campeón y decepción.\\n"
+
+        if goleador and len(goleador) > 1 and any(c.isupper() for c in goleador[1:3]):
+            muro_candidatos_txt += f"- {codigo}: escribió raro el goleador ({goleador}).\\n"
+
+    if not muro_candidatos_txt.strip():
+        muro_candidatos_txt = "- Nadie hizo una vergüenza particularmente escandalosa todavía.\\n"
+
     prompt = f"""{tono_prompt}
 
 Contexto actual:
@@ -102,7 +131,7 @@ Participantes para mencionar (elegí 2 o 3 y hacé comentarios sobre sus apuesta
 Orden de entrega (quién entregó primero y quién último):
 {entregas_txt}
 
-Generá TRES textos separados por la línea "---":
+Generá CINCO textos separados por la línea "---":
 
 1. BIENVENIDA: Un párrafo LARGO y jugoso de bienvenida (MÍNIMO 4-5 oraciones, puede ser más) que hable de cuánto falta para el mundial, cuántos entregaron, tire cargadas a los participantes mencionados, se burle de sus apuestas, y genere hype. Este texto tiene que ser el más largo y completo de todos. NO lo hagas corto.
 
@@ -118,18 +147,25 @@ Lista COMPLETA de participantes y sus apuestas (generá un delirio para CADA UNO
 
 Formato exacto:
 CODIGO: comentario
+
+5. MURO: Reescribí los siguientes candidatos del “Muro de la Vergüenza” con más picante, humor y veneno amistoso, respetando el tono del grupo. Una línea por candidato. Formato exacto:
+- comentario
+
+Candidatos:
+{muro_candidatos_txt}
 """
 
     texto = _llamar_gemini(prompt)
     if not texto:
         return _fallback_previa(dias_para_mundial, total_entregados, esperados_min, esperados_max)
 
-    # Separar bienvenida, footer, veredictos y delirios
+    # Separar bienvenida, footer, veredictos, delirios y muro
     partes = texto.split("---")
     bienvenida = partes[0].strip() if len(partes) >= 1 else ""
     footer = partes[1].strip() if len(partes) >= 2 else ""
     veredictos_raw = partes[2].strip() if len(partes) >= 3 else ""
     delirios_raw = partes[3].strip() if len(partes) >= 4 else ""
+    muro_raw = partes[4].strip() if len(partes) >= 5 else ""
 
     # Limpiar etiquetas
     for tag in ["BIENVENIDA:", "1.", "2.", "3.", "FOOTER:", "VEREDICTOS:", "1)", "2)", "3)"]:
@@ -161,7 +197,17 @@ CODIGO: comentario
             if cod and com.strip():
                 delirios[cod] = com.strip()
 
-    return {"bienvenida": bienvenida, "footer": footer, "veredictos": veredictos, "delirios": delirios}
+    # Parsear muro
+    muro = []
+    for linea in muro_raw.split("\n"):
+        linea = linea.strip()
+        if not linea:
+            continue
+        if linea.startswith("- "):
+            linea = linea[2:].strip()
+        muro.append(linea)
+
+    return {"bienvenida": bienvenida, "footer": footer, "veredictos": veredictos, "delirios": delirios, "muro": muro}
 
 
 @st.cache_data(ttl=GEMINI_CACHE_TTL)
@@ -214,6 +260,7 @@ def _fallback_previa(dias, entregados, esp_min, esp_max):
     return {
         "veredictos": {},
         "delirios": {},
+        "muro": [],
         "bienvenida": f"⏰ Faltan {dias} días para el Mundial 2026. Ya entregaron {entregados} valientes. ¿El resto? Seguramente todavía están googleando quién juega en el grupo de la muerte.",
         "footer": f"⏳ Esperamos entre {esp_min} y {esp_max} participantes. Faltan {faltan}+ vagos por entregar.",
     }
