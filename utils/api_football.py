@@ -291,7 +291,7 @@ def mapear_nombre_equipo(nombre_api):
         "Japan": "Japon", "Switzerland": "Suiza", "Turkey": "Turquia",
         "Norway": "Noruega", "Sweden": "Suecia", "Scotland": "Escocia",
         "Tunisia": "Tunez", "Egypt": "Egipto",
-        "Bosnia and Herzegovina": "Bosnia", "Bosnia And Herzegovina": "Bosnia",
+        "Bosnia and Herzegovina": "Bosnia", "Bosnia And Herzegovina": "Bosnia", "Bosnia & Herzegovina": "Bosnia",
         "Jordan": "Jordania", "Iraq": "Irak", "Iran": "Iran",
         "Algeria": "Argelia", "Belgium": "Belgica", "Croatia": "Croacia",
         "Colombia": "Colombia", "Canada": "Canada",

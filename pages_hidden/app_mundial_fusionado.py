@@ -87,6 +87,7 @@ def main():
 
     leaderboard = st.session_state["leaderboard"]
     resultados = st.session_state.get("resultados", pd.DataFrame())
+    apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
     campeon = st.session_state.get("campeon_real", "")
     tercero = st.session_state.get("tercero_real", "")
 
@@ -96,7 +97,7 @@ def main():
     if campeon:
         st.success(f"🏆 Campeón: **{campeon}** | 🥉 3er puesto: **{tercero}**")
 
-    from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos, formatear_horarios_partido, formatear_horarios_partido
+    from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos, formatear_horarios_partido
 
     proximos = obtener_proximos_partidos(resultados, 3)
     if not proximos.empty:
@@ -105,6 +106,10 @@ def main():
         for i, (_, p) in enumerate(proximos.iterrows()):
             with cols_prox[i]:
                 horarios_txt = formatear_horarios_partido(p.get("fecha"))
+                try:
+                    fecha_linea = p["fecha"].strftime("%d/%m/%Y")
+                except Exception:
+                    fecha_linea = ""
 
                 estadio = str(p.get("estadio", "") or "").strip()
                 ciudad = str(p.get("ciudad", "") or "").strip()
@@ -165,6 +170,7 @@ def main():
                     f'padding:10px; text-align:center;">'
                     f'<small style="color:#888;">{p["ronda"]}</small><br>'
                     f'<b>{local}</b> vs <b>{visitante}</b><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.85rem;">📅 {fecha_linea}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {horarios_txt}</span><br>'
                     f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
