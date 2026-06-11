@@ -49,6 +49,10 @@ PUNTOS = {
     "Peor Equipo": 8,
 }
 
+AJUSTES_MANUALES = {
+    "ALDO": -10,   # penalidad hardcodeada
+}
+
 PENALIDADES = {
     "revelacion_queda_grupos": -20,
     "campeon_no_llega_4tos": -20,
