@@ -14,6 +14,42 @@ REQUISITOS_REVELACION = {
     4: 1,  # Clase 4: debe pasar de grupos
 }
 
+ESTADOS_FINALIZADO = {"FT", "AET", "PEN"}
+
+def grupos_finalizados(resultados):
+    """
+    Retorna True si los 72 partidos de grupos están finalizados.
+    """
+    if resultados.empty or "ronda" not in resultados.columns or "estado" not in resultados.columns:
+        return False
+
+    partidos_g = resultados[resultados["ronda"].apply(lambda x: clasificar_ronda(str(x))) == "grupos"].copy()
+    if partidos_g.empty:
+        return False
+
+    if len(partidos_g) < 72:
+        return False
+
+    return partidos_g["estado"].isin(ESTADOS_FINALIZADO).all()
+
+def torneo_finalizado(resultados):
+    """
+    Retorna True si existe una final finalizada.
+    """
+    if resultados.empty or "ronda" not in resultados.columns or "estado" not in resultados.columns:
+        return False
+
+    finales = resultados[
+        resultados["ronda"].str.lower().str.contains("final", na=False) &
+        ~resultados["ronda"].str.lower().str.contains("semi|quarter|3rd", na=False)
+    ]
+
+    if finales.empty:
+        return False
+
+    return finales["estado"].isin(ESTADOS_FINALIZADO).any()
+
+
 def cargar_equipos_clase():
     path = os.path.join("data", "equipos_clase.csv")
     if os.path.exists(path):
@@ -126,14 +162,47 @@ def determinar_peor_equipo(tabla_grupos, fase_maxima):
     return df.iloc[0]["equipo"]
 
 def calcular_todas_las_categorias(resultados):
+    """
+    Calcula categorías especiales con lógica por etapas:
+
+    - Antes de terminar grupos: nada definido
+    - Después de grupos: solo Mejor 1era Fase y Peor Equipo
+    - Después del torneo: Revelación y Decepción también
+    - Figura y Goleador quedan para overrides/manual
+    """
+    vacio = {
+        "Figura": "",
+        "Goleador": "",
+        "Revelación": "",
+        "Decepción": "",
+        "Mejor 1era Fase": "",
+        "Peor Equipo": "",
+    }
+
+    if resultados is None or resultados.empty:
+        return vacio
+
     equipos_clase = cargar_equipos_clase()
     fase_maxima = calcular_fase_maxima_por_equipo(resultados)
     tabla_grupos = calcular_tabla_grupos(resultados)
-    return {
+
+    # 1) Antes del final de grupos: nada
+    if not grupos_finalizados(resultados):
+        return vacio
+
+    # 2) Después de grupos: ya podemos saber estas dos
+    categorias = {
         "Figura": "",
         "Goleador": "",
-        "Revelación": determinar_revelacion(equipos_clase, fase_maxima) or "No hay Revelación",
-        "Decepción": determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos),
+        "Revelación": "",
+        "Decepción": "",
         "Mejor 1era Fase": determinar_mejor_primera_fase(tabla_grupos),
         "Peor Equipo": determinar_peor_equipo(tabla_grupos, fase_maxima),
     }
+
+    # 3) Solo al terminar el torneo cerramos Revelación y Decepción
+    if torneo_finalizado(resultados):
+        categorias["Revelación"] = determinar_revelacion(equipos_clase, fase_maxima) or "No hay Revelación"
+        categorias["Decepción"] = determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos)
+
+    return categorias
