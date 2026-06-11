@@ -97,7 +97,64 @@ def main():
     if campeon:
         st.success(f"🏆 Campeón: **{campeon}** | 🥉 3er puesto: **{tercero}**")
 
-    from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos, formatear_horarios_partido
+    from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos, formatear_horarios_partido, ESTADOS_EN_VIVO
+
+    # ================================
+    # EN VIVO AHORA
+    # ================================
+    en_vivo = pd.DataFrame()
+    if resultados is not None and not resultados.empty and "estado" in resultados.columns:
+        en_vivo = resultados[resultados["estado"].isin(list(ESTADOS_EN_VIVO))].copy()
+        if not en_vivo.empty:
+            en_vivo = en_vivo.sort_values("fecha", ascending=True)
+
+    if not en_vivo.empty:
+        st.markdown("#### 🔴 En vivo ahora")
+        st.caption("⏱️ Actualización automática cada 50 segundos")
+        cols_live = st.columns(min(3, len(en_vivo)))
+
+        for i, (_, p) in enumerate(en_vivo.head(3).iterrows()):
+            with cols_live[i]:
+                local = str(p["equipo_local"]).strip()
+                visitante = str(p["equipo_visitante"]).strip()
+                gl = int(p["goles_local"]) if pd.notna(p.get("goles_local")) else 0
+                gv = int(p["goles_visitante"]) if pd.notna(p.get("goles_visitante")) else 0
+                estado = str(p.get("estado", "")).strip()
+                minuto = p.get("minuto")
+
+                estado_txt = estado
+                if estado == "HT":
+                    estado_txt = "Entretiempo"
+                elif minuto and pd.notna(minuto):
+                    estado_txt = f"{estado} · {int(minuto)}'"
+
+                estadio = str(p.get("estadio", "") or "").strip()
+                ciudad = str(p.get("ciudad", "") or "").strip()
+
+                if estadio and ciudad:
+                    lugar = f"{estadio}, {ciudad}"
+                elif estadio:
+                    lugar = estadio
+                elif ciudad:
+                    lugar = ciudad
+                else:
+                    lugar = "Sede por confirmar"
+
+                horarios_txt = formatear_horarios_partido(p.get("fecha"))
+
+                st.markdown(
+                    f'<div style="background:#2a1a1a; border:1px solid #E74C3C; border-radius:8px; '
+                    f'padding:12px; text-align:center;">'
+                    f'<small style="color:#FFB3B3;">{p["ronda"]}</small><br>'
+                    f'<b>{local}</b> {gl}-{gv} <b>{visitante}</b><br>'
+                    f'<span style="color:#FFD0D0; font-size:0.9rem;">🔴 {estado_txt}</span><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.85rem;">🕒 {horarios_txt}</span><br>'
+                    f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+
+        st.divider()
 
     proximos = obtener_proximos_partidos(resultados, 3)
     if not proximos.empty:
