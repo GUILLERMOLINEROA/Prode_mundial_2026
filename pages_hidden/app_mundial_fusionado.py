@@ -183,15 +183,21 @@ def main():
 
                 st.markdown(
                     f'<div style="background:#2a1a1a; border:1px solid #E74C3C; border-radius:8px; '
-                    f'padding:12px; text-align:center;">'
-                    f'<small style="color:#FFB3B3;">{p["ronda"]}</small><br>'
-                    f'<b>{local}</b> {gl}-{gv} <b>{visitante}</b><br>'
-                    f'<span style="color:#FFD0D0; font-size:0.9rem;">🔴 {estado_txt}</span><br>'
-                    f'<span style="color:#AEC6CF; font-size:0.85rem;">🕒 {horarios_txt}</span><br>'
-                    f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
-                    f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
-                    f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
+                    f'padding:16px; text-align:center;">'
+                    f'<small style="color:#FFB3B3; font-size:0.9rem;">{p["ronda"]}</small>'
+                    f'<div style="margin:10px 0 6px 0; display:flex; justify-content:center; align-items:center; gap:14px; flex-wrap:wrap;">'
+                    f'<span style="font-size:1.9rem; font-weight:800; color:#FFFFFF;">{local}</span>'
+                    f'<span style="font-size:2.3rem; font-weight:900; color:#C8E600; letter-spacing:1px;">{gl}-{gv}</span>'
+                    f'<span style="font-size:1.9rem; font-weight:800; color:#FFFFFF;">{visitante}</span>'
+                    f'</div>'
+                    f'<div style="color:#FFD0D0; font-size:1.05rem; font-weight:700; margin-bottom:8px;">🔴 {estado_txt}</div>'
+                    f'<span style="color:#AEC6CF; font-size:0.88rem;">🕒 {horarios_txt}</span><br>'
+                    f'<span style="color:#7C8C8D; font-size:0.82rem;">📍 {lugar}</span><br>'
+                    f'<div style="margin-top:10px;">'
+                    f'<span style="color:#AEC6CF; font-size:0.78rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.78rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
                     f'{empate_html}'
+                    f'</div>'
                     f'</div>',
                     unsafe_allow_html=True
                 )
