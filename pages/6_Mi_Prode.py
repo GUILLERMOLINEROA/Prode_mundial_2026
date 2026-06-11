@@ -1,0 +1,2 @@
+import runpy
+runpy.run_path("pages_hidden/6_Mi_Prode.py", run_name="__main__")
