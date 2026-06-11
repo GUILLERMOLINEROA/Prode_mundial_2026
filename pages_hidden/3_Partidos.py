@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from utils.data_loader import cargar_todo
-from utils.api_football import clasificar_ronda, estado_display, hay_partidos_en_vivo, ESTADOS_EN_VIVO, ESTADOS_FINALIZADO
+from utils.api_football import clasificar_ronda, estado_display, hay_partidos_en_vivo, ESTADOS_EN_VIVO, ESTADOS_FINALIZADO, formatear_horarios_partido, formatear_horarios_partido
 
 st.set_page_config(page_title="Partidos", page_icon="📊", layout="wide")
 
@@ -176,16 +176,26 @@ def main():
                 else:
                     ganador_visit = "color: #C8E600; font-weight: bold;"
 
+        horarios_txt = formatear_horarios_partido(p.get("fecha"))
+        horarios_html = ""
+        if horarios_txt:
+            horarios_html = (
+                f'<div style="margin-top:6px; text-align:center; color:#AEC6CF; font-size:0.8rem;">'
+                f'🕒 {horarios_txt}</div>'
+            )
+
         st.markdown(
-            f'<div style="display:flex; justify-content:space-between; align-items:center; '
-            f'background:{bg}; border-left:3px solid {borde}; padding:10px 20px; '
+            f'<div style="background:{bg}; border-left:3px solid {borde}; padding:10px 20px; '
             f'border-radius:8px; margin:4px 0;">'
+            f'<div style="display:flex; justify-content:space-between; align-items:center;">'
             f'<span style="width:140px; color:#7C8C8D; font-size:0.85rem;">{ronda}</span>'
             f'<span style="width:180px; text-align:right; {ganador_local}">{local}</span>'
             f'<span style="width:120px; text-align:center; font-size:1.1rem;">{resultado}</span>'
             f'<span style="width:180px; {ganador_visit}">{visitante}</span>'
             f'<span style="width:130px; text-align:right; color:{borde}; font-size:0.8rem;">'
             f'{estado_txt}</span>'
+            f'</div>'
+            f'{horarios_html}'
             f'</div>',
             unsafe_allow_html=True
         )
