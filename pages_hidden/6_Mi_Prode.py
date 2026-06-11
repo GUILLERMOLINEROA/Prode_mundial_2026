@@ -26,6 +26,14 @@ def _resultado_texto(gl, gv):
         return "Visitante"
     return "Empate"
 
+def _resultado_predicho_completo(local, gl, gv, visitante):
+    if pd.isna(gl) or pd.isna(gv):
+        return "—"
+    try:
+        return f"{local} {int(gl)}-{int(gv)} {visitante}"
+    except Exception:
+        return "—"
+
 
 def _extraer_num_partido(pid):
     m = re.search(r"(\\d+)", str(pid))
@@ -192,10 +200,6 @@ def main():
             st.info("No hay apuestas de fase de grupos para este participante.")
         else:
             grupos_sub = grupos_sub.copy()
-            grupos_sub["Resultado predicho"] = grupos_sub.apply(
-                lambda r: _resultado_texto(r["goles_local_pred"], r["goles_visitante_pred"]),
-                axis=1
-            )
 
             filas = []
             for _, r in grupos_sub.iterrows():
@@ -205,10 +209,12 @@ def main():
 
                 filas.append({
                     "Partido": r["partido_id"],
-                    "Local": r["equipo_local"],
-                    "GL pred": r["goles_local_pred"],
-                    "GV pred": r["goles_visitante_pred"],
-                    "Visitante": r["equipo_visitante"],
+                    "Predicción": _resultado_predicho_completo(
+                        str(r["equipo_local"]),
+                        r["goles_local_pred"],
+                        r["goles_visitante_pred"],
+                        str(r["equipo_visitante"]),
+                    ),
                     "Estado API": _estado_api_humano(real_row),
                     "Resultado real": _resultado_real_texto(
                         real_row,
