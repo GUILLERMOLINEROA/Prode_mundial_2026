@@ -413,6 +413,19 @@ def calcular_puntuacion_total(
 # =============================================================================
 
 def generar_leaderboard(todos_los_puntajes):
+    # Orden de entrega como criterio de desempate
+    orden_entrega = {}
+    try:
+        from utils.group_config import entregas_path
+        entregas_df = pd.read_csv(entregas_path())
+        entregas_df.columns = entregas_df.columns.str.strip()
+        for idx, row in entregas_df.iterrows():
+            codigo = str(row.get("codigo", "")).strip().upper()
+            if codigo:
+                orden_entrega[codigo] = idx
+    except Exception:
+        orden_entrega = {}
+
     datos = []
     for p in todos_los_puntajes:
         pts_ronda = p.get("pts_por_ronda_elim", {})
@@ -442,7 +455,10 @@ def generar_leaderboard(todos_los_puntajes):
                 pts_ganador = int(jugados["acierto_ganador"].sum()) * PUNTOS["grupos_ganador"]
                 pts_exacto = int(jugados["acierto_exacto"].sum()) * PUNTOS["grupos_exacto"]
         datos.append({
-            "Posición": 0, "Participante": p["participante"], "Total": p["total"],
+            "Posición": 0,
+            "OrdenEntrega": orden_entrega.get(str(p["participante"]).strip().upper(), 9999),
+            "Participante": p["participante"],
+            "Total": p["total"],
             "Grupos": p["pts_grupos"], "Grupos L/E/V": pts_ganador, "Grupos Exacto": pts_exacto,
             "Eliminatorias": p["pts_eliminatorias"],
             "16vos": pts_ronda.get("16vos", 0), "8vos": pts_ronda.get("8vos", 0),
@@ -458,6 +474,11 @@ def generar_leaderboard(todos_los_puntajes):
             "Pen. Peor Equipo": pen_peor, "Pen. Decepción": pen_decepcion,
         })
     df = pd.DataFrame(datos)
-    df = df.sort_values(by=["Total", "Grupos"], ascending=[False, False]).reset_index(drop=True)
+    df = df.sort_values(
+        by=["Total", "Grupos", "OrdenEntrega", "Participante"],
+        ascending=[False, False, True, True]
+    ).reset_index(drop=True)
     df["Posición"] = range(1, len(df) + 1)
+    if "OrdenEntrega" in df.columns:
+        df = df.drop(columns=["OrdenEntrega"])
     return df
