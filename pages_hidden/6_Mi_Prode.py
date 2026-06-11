@@ -5,6 +5,7 @@ import streamlit as st
 
 from utils.data_loader import cargar_todo, foto_participante
 from utils.excel_reader import cargar_todos_los_participantes
+from utils.api_football import estado_display
 
 st.set_page_config(page_title="Mi Prode", page_icon="🧾", layout="wide")
 
@@ -31,11 +32,77 @@ def _extraer_num_partido(pid):
     return int(m.group(1)) if m else 9999
 
 
+def _buscar_resultado_real(local, visitante, resultados):
+    """
+    Busca el partido real por local/visitante.
+    Si lo encuentra invertido, devuelve invertido=True para dar vuelta el score.
+    """
+    if resultados is None or resultados.empty:
+        return None, False
+
+    sub = resultados[
+        (resultados["equipo_local"].astype(str).str.strip() == str(local).strip()) &
+        (resultados["equipo_visitante"].astype(str).str.strip() == str(visitante).strip())
+    ]
+    if not sub.empty:
+        return sub.iloc[0], False
+
+    sub_inv = resultados[
+        (resultados["equipo_local"].astype(str).str.strip() == str(visitante).strip()) &
+        (resultados["equipo_visitante"].astype(str).str.strip() == str(local).strip())
+    ]
+    if not sub_inv.empty:
+        return sub_inv.iloc[0], True
+
+    return None, False
+
+
+def _estado_api_humano(row):
+    if row is None:
+        return "—"
+    codigo = str(row.get("estado", "") or "").strip()
+    if not codigo:
+        return "—"
+    emoji, texto = estado_display(codigo)
+    return f"{codigo} · {texto}"
+
+
+def _resultado_real_texto(row, invertido=False, local_name="", visitante_name=""):
+    if row is None:
+        return "—"
+
+    gl = row.get("goles_local")
+    gv = row.get("goles_visitante")
+    pl = row.get("penales_local")
+    pv = row.get("penales_visitante")
+
+    if invertido:
+        gl, gv = gv, gl
+        pl, pv = pv, pl
+
+    if pd.notna(gl) and pd.notna(gv):
+        txt = f"{local_name} {int(gl)}-{int(gv)} {visitante_name}".strip()
+        if pd.notna(pl) and pd.notna(pv):
+            txt += f" (Pen {int(pl)}-{int(pv)})"
+        return txt
+
+    return "—"
+
+
+def _fecha_real_texto(row):
+    if row is None:
+        return "—"
+    try:
+        return row["fecha"].strftime("%d/%m %H:%M")
+    except Exception:
+        return str(row.get("fecha", "—"))
+
+
 def main():
     st.markdown('<h1 class="titulo-prode">🧾 MI PRODE</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p style="text-align:center; color:#AEC6CF;">'
-        'Elegí un participante y mirá exactamente qué apostó.</p>',
+        'Elegí un participante y mirá exactamente qué apostó vs lo que va pasando en la realidad.</p>',
         unsafe_allow_html=True
     )
 
@@ -47,6 +114,7 @@ def main():
     apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
     categorias_todos = st.session_state.get("categorias_todos", {})
     total_results_todos = st.session_state.get("total_results_todos", {})
+    resultados = st.session_state.get("resultados", pd.DataFrame())
 
     # pred_elim no estaba en session_state; lo recargamos desde excel_reader
     _, pred_elim, _, _ = cargar_todos_los_participantes()
@@ -101,6 +169,19 @@ def main():
 
     st.divider()
 
+    with st.expander("ℹ️ Leyenda de estados de la API", expanded=False):
+        st.markdown(
+            "- **NS** = No empezó  \n"
+            "- **1H** = Primer tiempo  \n"
+            "- **HT** = Entretiempo  \n"
+            "- **2H** = Segundo tiempo  \n"
+            "- **ET** = Tiempo extra  \n"
+            "- **P** = Penales  \n"
+            "- **FT** = Finalizado  \n"
+            "- **AET** = Finalizado en prórroga  \n"
+            "- **PEN** = Finalizado por penales"
+        )
+
     tab1, tab2, tab3 = st.tabs(["🌍 Fase de grupos", "🏟️ Eliminatorias", "📋 Tabla final pronosticada"])
 
     # =========================
@@ -116,27 +197,42 @@ def main():
                 axis=1
             )
 
+            filas = []
+            for _, r in grupos_sub.iterrows():
+                real_row, invertido = _buscar_resultado_real(
+                    r["equipo_local"], r["equipo_visitante"], resultados
+                )
+
+                filas.append({
+                    "Partido": r["partido_id"],
+                    "Local": r["equipo_local"],
+                    "GL pred": r["goles_local_pred"],
+                    "GV pred": r["goles_visitante_pred"],
+                    "Visitante": r["equipo_visitante"],
+                    "Estado API": _estado_api_humano(real_row),
+                    "Resultado real": _resultado_real_texto(
+                        real_row,
+                        invertido,
+                        str(r["equipo_local"]),
+                        str(r["equipo_visitante"]),
+                    ),
+                    "Fecha real": _fecha_real_texto(real_row),
+                })
+
+            df_show = pd.DataFrame(filas)
+
+            # El grupo ya está implícito en el código de partido (GA1, GB2, etc.)
+            # así que usamos eso para filtrar sin necesitar columna "Grupo".
+            grupos_disponibles = sorted(df_show["Partido"].astype(str).str[1].dropna().unique().tolist())
+
             filtro_grupo = st.selectbox(
                 "Filtrar grupo:",
-                ["Todos"] + sorted(grupos_sub["grupo"].dropna().astype(str).unique().tolist()),
+                ["Todos"] + grupos_disponibles,
                 key="filtro_mi_prode_grupos"
             )
 
-            df_show = grupos_sub.copy()
             if filtro_grupo != "Todos":
-                df_show = df_show[df_show["grupo"].astype(str) == filtro_grupo]
-
-            df_show = df_show[[
-                "partido_id", "grupo", "equipo_local", "goles_local_pred",
-                "goles_visitante_pred", "equipo_visitante", "Resultado predicho"
-            ]].rename(columns={
-                "partido_id": "Partido",
-                "grupo": "Grupo",
-                "equipo_local": "Local",
-                "goles_local_pred": "GL",
-                "goles_visitante_pred": "GV",
-                "equipo_visitante": "Visitante",
-            })
+                df_show = df_show[df_show["Partido"].astype(str).str[1] == filtro_grupo]
 
             st.dataframe(df_show, use_container_width=True, hide_index=True)
 
@@ -147,30 +243,37 @@ def main():
         if elim_sub.empty:
             st.info("No hay apuestas de eliminatorias para este participante.")
         else:
+            st.caption("Si el cruce pronosticado no coincide con el fixture real, el partido puede aparecer sin match real todavía.")
+
             elim_sub = elim_sub.copy()
             elim_sub["orden_partido"] = elim_sub["partido_id"].apply(_extraer_num_partido)
             elim_sub = elim_sub.sort_values(["orden_partido", "ronda"], ascending=[True, True])
 
-            elim_sub["Resultado predicho"] = elim_sub.apply(
-                lambda r: _resultado_texto(r["goles1_pred"], r["goles2_pred"]),
-                axis=1
-            )
+            filas = []
+            for _, r in elim_sub.iterrows():
+                real_row, invertido = _buscar_resultado_real(
+                    r["equipo1"], r["equipo2"], resultados
+                )
 
-            show = elim_sub[[
-                "partido_id", "ronda", "equipo1", "goles1_pred", "goles2_pred",
-                "equipo2", "penales1_pred", "penales2_pred", "ganador_pred"
-            ]].rename(columns={
-                "partido_id": "Partido",
-                "ronda": "Ronda",
-                "equipo1": "Local",
-                "goles1_pred": "GL",
-                "goles2_pred": "GV",
-                "equipo2": "Visitante",
-                "penales1_pred": "Pen L",
-                "penales2_pred": "Pen V",
-                "ganador_pred": "Ganador predicho",
-            })
+                filas.append({
+                    "Partido": r["partido_id"],
+                    "Ronda": r["ronda"],
+                    "Local pred": r["equipo1"],
+                    "GL pred": r["goles1_pred"],
+                    "GV pred": r["goles2_pred"],
+                    "Visitante pred": r["equipo2"],
+                    "Ganador pred": r["ganador_pred"],
+                    "Estado API": _estado_api_humano(real_row) if real_row is not None else "Ese delirio no existió",
+                    "Resultado real": _resultado_real_texto(
+                        real_row,
+                        invertido,
+                        str(r["equipo1"]),
+                        str(r["equipo2"]),
+                    ) if real_row is not None else "—",
+                    "Fecha real": _fecha_real_texto(real_row) if real_row is not None else "—",
+                })
 
+            show = pd.DataFrame(filas)
             st.dataframe(show, use_container_width=True, hide_index=True)
 
     # =========================
