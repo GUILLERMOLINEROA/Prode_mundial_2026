@@ -109,7 +109,7 @@ def calcular_evolucion_puntos():
             puntos_acum += pts_bonos
             evolucion.append({
                 "participante": part,
-                "fecha": pd.Timestamp("2026-07-20"),
+                "fecha": pd.Timestamp("2026-07-20", tz="UTC"),
                 "puntos": puntos_acum,
                 "evento": f"Bonos: +{pts_bonos} (Campeon:{puntaje_data['pts_campeon']}, 3ero:{puntaje_data['pts_tercero']}, Esp:{puntaje_data['pts_especiales']})",
             })
@@ -129,6 +129,10 @@ def main():
 
     with st.spinner("📊 Calculando evolución..."):
         df_evol = calcular_evolucion_puntos()
+
+    if not df_evol.empty and "fecha" in df_evol.columns:
+        df_evol["fecha"] = pd.to_datetime(df_evol["fecha"], utc=True, errors="coerce")
+        df_evol = df_evol.dropna(subset=["fecha"])
 
     if df_evol.empty:
         st.warning("No hay datos suficientes.")
@@ -174,7 +178,7 @@ def main():
     shapes = []
     annotations = []
     for fase, fecha_str in fases_fechas:
-        fecha_ts = pd.Timestamp(fecha_str)
+        fecha_ts = pd.Timestamp(fecha_str, tz="UTC")
         shapes.append(dict(
             type="line", x0=fecha_ts, x1=fecha_ts, y0=0, y1=1,
             xref="x", yref="paper",
@@ -193,7 +197,7 @@ def main():
         height=600,
         xaxis=dict(
             title="Fecha",
-            range=[pd.Timestamp("2026-06-08"), pd.Timestamp("2026-07-22")],
+            range=[pd.Timestamp("2026-06-08", tz="UTC"), pd.Timestamp("2026-07-22", tz="UTC")],
             tickformat="%d/%m",
         ),
         yaxis_title="Puntos Acumulados",
@@ -218,7 +222,7 @@ def main():
         "Semifinales": "2026-07-17", "Final y Bonos": "2026-07-22",
     }
 
-    fecha_corte = pd.Timestamp(fase_map[fase_selec])
+    fecha_corte = pd.Timestamp(fase_map[fase_selec], tz="UTC")
     tabla_fase = []
     for part in leaderboard["Participante"].tolist():
         df_part = df_evol[(df_evol["participante"] == part) & (df_evol["fecha"] <= fecha_corte)]
@@ -252,7 +256,7 @@ def main():
     st.markdown("---")
     st.markdown("### 🔄 Movimientos Destacados")
 
-    df_grupos = df_evol[df_evol["fecha"] <= pd.Timestamp("2026-06-28")]
+    df_grupos = df_evol[df_evol["fecha"] <= pd.Timestamp("2026-06-28", tz="UTC")]
     pos_grupos = {}
     for part in leaderboard["Participante"].tolist():
         df_p = df_grupos[df_grupos["participante"] == part]
