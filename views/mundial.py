@@ -53,12 +53,7 @@ def main():
             st.caption("⚪ Sin API key — Modo simulación")
 
     with st.sidebar:
-        st.markdown("### ⚙️ Configuración")
         st.session_state["usar_simulacion"] = False
-        if st.button("🔄 Recargar datos"):
-            from utils.data_loader import forzar_recarga
-            forzar_recarga()
-            st.rerun()
 
     # =================================================================
     # CARGA CENTRALIZADA
