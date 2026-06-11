@@ -359,6 +359,15 @@ def calcular_puntuacion_total(
         pts_especiales + pts_penalidades
     )
     
+    ajuste_manual = AJUSTES_MANUALES.get(str(participante).strip().upper(), 0)
+    if ajuste_manual != 0:
+        pts_penalidades += ajuste_manual
+        total += ajuste_manual
+        try:
+            razones_pen.append(f"⚙️ Ajuste manual para {participante}: {ajuste_manual} pts")
+        except Exception:
+            pass
+
     return {
         "participante": participante,
         "total": total,
