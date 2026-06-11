@@ -97,11 +97,10 @@ def calcular_puntos_grupos(
         g_pred_l = ap["goles_local_pred"]
         g_pred_v = ap["goles_visitante_pred"]
         
-        # Buscar resultado real
+        # Buscar resultado real (si existe), sin exigir FT
         res = resultados_reales[
             (resultados_reales["equipo_local"] == local) &
-            (resultados_reales["equipo_visitante"] == visitante) &
-            (resultados_reales["estado"] == "FT")
+            (resultados_reales["equipo_visitante"] == visitante)
         ]
         
         if res.empty:
@@ -116,34 +115,56 @@ def calcular_puntos_grupos(
             continue
         
         r = res.iloc[0]
-        g_real_l = int(r["goles_local"])
-        g_real_v = int(r["goles_visitante"])
-        
+        estado_real = str(r.get("estado", "") or "").strip()
+        g_real_l = r.get("goles_local")
+        g_real_v = r.get("goles_visitante")
+
+        # Si todavía no empezó, no suma nada
+        if estado_real == "NS" or pd.isna(g_real_l) or pd.isna(g_real_v):
+            detalles.append({
+                "partido_id": ap["partido_id"], "grupo": ap.get("grupo", ""),
+                "equipo_local": local, "equipo_visitante": visitante,
+                "pred_local": g_pred_l, "pred_visitante": g_pred_v,
+                "real_local": None, "real_visitante": None,
+                "acierto_ganador": False, "acierto_exacto": False,
+                "puntos": 0, "estado": "pendiente",
+            })
+            continue
+
+        g_real_l = int(g_real_l)
+        g_real_v = int(g_real_v)
+
         res_real = _determinar_resultado(g_real_l, g_real_v)
         res_pred = _determinar_resultado(g_pred_l, g_pred_v) if (
             g_pred_l is not None and g_pred_v is not None
         ) else None
-        
+
         ac_gan = (res_real == res_pred) if res_pred else False
+
+        # El exacto también cuenta de forma PROVISIONAL mientras el partido está en juego.
+        # Si el marcador cambia, se recalcula y puede perderse o recuperarse.
+        estado_final = estado_real in {"FT", "AET", "PEN"}
         ac_ex = (
             g_pred_l is not None and g_pred_v is not None and
             g_pred_l == g_real_l and g_pred_v == g_real_v
         )
-        
+
         pts = 0
         if ac_gan:
             pts += PUNTOS["grupos_ganador"]
         if ac_ex:
             pts += PUNTOS["grupos_exacto"]
         puntos_total += pts
-        
+
+        estado_detalle = "jugado" if estado_final else "en_vivo"
+
         detalles.append({
             "partido_id": ap["partido_id"], "grupo": ap.get("grupo", ""),
             "equipo_local": local, "equipo_visitante": visitante,
             "pred_local": g_pred_l, "pred_visitante": g_pred_v,
             "real_local": g_real_l, "real_visitante": g_real_v,
             "acierto_ganador": ac_gan, "acierto_exacto": ac_ex,
-            "puntos": pts, "estado": "jugado",
+            "puntos": pts, "estado": estado_detalle,
         })
     
     return puntos_total, pd.DataFrame(detalles)
