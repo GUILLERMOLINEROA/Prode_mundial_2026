@@ -284,11 +284,11 @@ def mapear_nombre_equipo(nombre_api):
         "Cote D'Ivoire": "Costa de Marfil",
         "Czech Republic": "Republica Checa", "Czechia": "Republica Checa",
         "Saudi Arabia": "Arabia Saudita", "New Zealand": "Nueva Zelanda",
-        "Cape Verde": "Cabo Verde", "DR Congo": "Congo", "Congo DR": "Congo",
+        "Cape Verde": "Cabo Verde", "Cape Verde Islands": "Cabo Verde", "Cape Verde Is.": "Cabo Verde", "DR Congo": "Congo", "Congo DR": "Congo",
         "South Africa": "Sudafrica", "Morocco": "Marruecos",
         "Germany": "Alemania", "England": "Inglaterra",
         "France": "Francia", "Spain": "España", "Brazil": "Brasil",
-        "Japan": "Japon", "Switzerland": "Suiza", "Turkey": "Turquia",
+        "Japan": "Japon", "Switzerland": "Suiza", "Turkey": "Turquia", "Türkiye": "Turquia", "Turkiye": "Turquia",
         "Norway": "Noruega", "Sweden": "Suecia", "Scotland": "Escocia",
         "Tunisia": "Tunez", "Egypt": "Egipto",
         "Bosnia and Herzegovina": "Bosnia", "Bosnia And Herzegovina": "Bosnia", "Bosnia & Herzegovina": "Bosnia",
@@ -297,7 +297,7 @@ def mapear_nombre_equipo(nombre_api):
         "Colombia": "Colombia", "Canada": "Canada",
         "Panama": "Panama", "Paraguay": "Paraguay",
         "Qatar": "Qatar", "Uzbekistan": "Uzbekistan",
-        "Curacao": "Curazao", "Haiti": "Haiti",
+        "Curacao": "Curazao", "Curaçao": "Curazao", "Haiti": "Haiti",
         "Australia": "Australia", "Austria": "Austria",
     }
     return mapeo.get(nombre_api, nombre_api)
