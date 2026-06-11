@@ -97,6 +97,10 @@ def obtener_partidos_mundial():
                 "penales_visitante": fixture["score"]["penalty"]["away"],
                 "estado": fixture["fixture"]["status"]["short"],
                 "minuto": fixture["fixture"]["status"].get("elapsed"),
+                "estadio": (fixture.get("fixture", {}).get("venue", {}) or {}).get("name", ""),
+                "ciudad": (fixture.get("fixture", {}).get("venue", {}) or {}).get("city", ""),
+                "estadio": (fixture.get("fixture", {}).get("venue", {}) or {}).get("name", ""),
+                "ciudad": (fixture.get("fixture", {}).get("venue", {}) or {}).get("city", ""),
             })
         df = pd.DataFrame(partidos)
         if not df.empty:
@@ -219,6 +223,21 @@ def obtener_goleadores_mundial():
         return pd.DataFrame(goleadores)
     except Exception:
         return pd.DataFrame()
+
+# =============================================================================
+# PROXIMOS PARTIDOS
+# =============================================================================
+def obtener_proximos_partidos(resultados, cantidad=5):
+    """
+    Retorna los próximos N partidos programados.
+    """
+    if resultados.empty:
+        return pd.DataFrame()
+    programados = resultados[resultados["estado"] == "NS"].copy()
+    if programados.empty:
+        return pd.DataFrame()
+    programados = programados.sort_values("fecha", ascending=True)
+    return programados.head(cantidad)
 
 # =============================================================================
 # ULTIMOS RESULTADOS

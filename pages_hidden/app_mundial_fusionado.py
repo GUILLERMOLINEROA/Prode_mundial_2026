@@ -106,7 +106,43 @@ def main():
     if campeon:
         st.success(f"🏆 Campeón: **{campeon}** | 🥉 3er puesto: **{tercero}**")
 
-    from utils.api_football import obtener_ultimos_resultados
+    from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos
+
+    proximos = obtener_proximos_partidos(resultados, 3)
+    if not proximos.empty:
+        st.markdown("#### 🗓️ Próximos Partidos")
+        cols_prox = st.columns(3)
+        for i, (_, p) in enumerate(proximos.iterrows()):
+            with cols_prox[i]:
+                try:
+                    fecha_txt = p["fecha"].strftime("%d/%m %H:%M")
+                except Exception:
+                    fecha_txt = str(p.get("fecha", ""))
+
+                estadio = str(p.get("estadio", "") or "").strip()
+                ciudad = str(p.get("ciudad", "") or "").strip()
+
+                if estadio and ciudad:
+                    lugar = f"{estadio}, {ciudad}"
+                elif estadio:
+                    lugar = estadio
+                elif ciudad:
+                    lugar = ciudad
+                else:
+                    lugar = "Sede por confirmar"
+
+                st.markdown(
+                    f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
+                    f'padding:10px; text-align:center;">'
+                    f'<small style="color:#888;">{p["ronda"]}</small><br>'
+                    f'<b>{p["equipo_local"]}</b> vs <b>{p["equipo_visitante"]}</b><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {fecha_txt}</span><br>'
+                    f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+        st.divider()
+
     ultimos = obtener_ultimos_resultados(resultados, 3)
     if not ultimos.empty:
         st.markdown("#### ⚡ Últimos Resultados")
