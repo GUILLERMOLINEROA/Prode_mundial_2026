@@ -83,7 +83,7 @@ def cargar_todo():
     if not categorias_todos:
         return False
 
-    usar_simulacion = st.session_state.get("usar_simulacion", True)
+    usar_simulacion = st.session_state.get("usar_simulacion", False)
     if usar_simulacion:
         from utils.simulacion import generar_resultados_simulados
         fase_sim = st.session_state.get("fase_simulacion", "todo")
