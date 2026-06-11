@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import os
 
 from utils.messages import obtener_mensaje_posicion, obtener_titulo_ficha
+from utils.group_config import overrides_path, fotos_dir
 
 st.set_page_config(page_title="Análisis", page_icon="🔍", layout="wide")
 
