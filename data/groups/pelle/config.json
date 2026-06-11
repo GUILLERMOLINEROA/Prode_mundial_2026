@@ -5,6 +5,6 @@
     "banners_propios": true,
     "participantes_esperados_min": 5,
     "participantes_esperados_max": 15,
-    "modo_app": "previa",
+    "modo_app": "mundial",
     "emails_activos": false
 }

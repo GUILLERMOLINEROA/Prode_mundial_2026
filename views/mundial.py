@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 import os
 import base64
 import random
+from utils.participantes_info import cargar_participantes_info
+from utils.comentarios_campeon import comentario_campeon_contextual
 from utils.group_config import fotos_dir
 
 st.set_page_config(
@@ -104,7 +106,43 @@ def main():
     if campeon:
         st.success(f"🏆 Campeón: **{campeon}** | 🥉 3er puesto: **{tercero}**")
 
-    from utils.api_football import obtener_ultimos_resultados
+    from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos
+
+    proximos = obtener_proximos_partidos(resultados, 3)
+    if not proximos.empty:
+        st.markdown("#### 🗓️ Próximos Partidos")
+        cols_prox = st.columns(3)
+        for i, (_, p) in enumerate(proximos.iterrows()):
+            with cols_prox[i]:
+                try:
+                    fecha_txt = p["fecha"].strftime("%d/%m %H:%M")
+                except Exception:
+                    fecha_txt = str(p.get("fecha", ""))
+
+                estadio = str(p.get("estadio", "") or "").strip()
+                ciudad = str(p.get("ciudad", "") or "").strip()
+
+                if estadio and ciudad:
+                    lugar = f"{estadio}, {ciudad}"
+                elif estadio:
+                    lugar = estadio
+                elif ciudad:
+                    lugar = ciudad
+                else:
+                    lugar = "Sede por confirmar"
+
+                st.markdown(
+                    f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
+                    f'padding:10px; text-align:center;">'
+                    f'<small style="color:#888;">{p["ronda"]}</small><br>'
+                    f'<b>{p["equipo_local"]}</b> vs <b>{p["equipo_visitante"]}</b><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {fecha_txt}</span><br>'
+                    f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+        st.divider()
+
     ultimos = obtener_ultimos_resultados(resultados, 3)
     if not ultimos.empty:
         st.markdown("#### ⚡ Últimos Resultados")
@@ -304,6 +342,7 @@ def main():
     if "categorias_todos" in st.session_state:
         with st.expander("🎭 Los Apostadores y sus Delirios", expanded=False):
             categorias_todos = st.session_state.get("categorias_todos", {})
+            participantes_info_map = cargar_participantes_info()
             comentarios_campeon = {
                 "Argentina": "Obvio, papá. ¿Quién no va con la Scaloneta?",
                 "Brasil": "Ir con Brasil siendo argentino es como aplaudir un gol en contra. Traidor.",
@@ -339,7 +378,8 @@ def main():
 
             for i, (nombre, cats) in enumerate(sorted(categorias_todos.items()), 1):
                 camp = cats.get("Campeon", "No definido")
-                comentario = comentarios_campeon.get(camp, "")
+                nacionalidad = participantes_info_map.get(nombre, {}).get("nacionalidad", "")
+                comentario = comentario_campeon_contextual(nombre, camp, nacionalidad) or comentarios_campeon.get(camp, "")
                 if not comentario:
                     random.seed(hash(nombre + camp))
                     comentario = random.choice(comentario_default_list)
