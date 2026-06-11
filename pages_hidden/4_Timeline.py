@@ -5,7 +5,7 @@ import os
 
 from utils.data_loader import cargar_todo, foto_participante
 from utils.api_football import clasificar_ronda
-from utils.scoring import PUNTOS
+from utils.scoring import PUNTOS, AJUSTES_MANUALES
 
 st.set_page_config(page_title="Timeline", page_icon="📈", layout="wide")
 
@@ -32,14 +32,15 @@ def calcular_evolucion_puntos():
         total_results = puntaje_data.get("total_results", {})
         equipos_pred_por_ronda = total_results.get("equipos_por_ronda", {}) if isinstance(total_results, dict) else {}
 
-        puntos_acum = 0
+        ajuste_manual_inicial = AJUSTES_MANUALES.get(str(part).strip().upper(), 0)
+        puntos_acum = ajuste_manual_inicial
         equipos_ya_contados = {}
 
         evolucion.append({
             "participante": part,
-            "fecha": pd.Timestamp("2026-06-10"),
-            "puntos": 0,
-            "evento": "Inicio del torneo",
+            "fecha": pd.Timestamp("2026-06-10", tz="UTC"),
+            "puntos": puntos_acum,
+            "evento": f"Inicio del torneo{' (ajuste manual ' + str(ajuste_manual_inicial) + ')' if ajuste_manual_inicial != 0 else ''}",
         })
 
         for _, partido in partidos_ordenados.iterrows():
@@ -93,14 +94,15 @@ def calcular_evolucion_puntos():
         pts_extras = (puntaje_data["pts_campeon"] + puntaje_data["pts_tercero"] +
                      puntaje_data["pts_especiales"] + puntaje_data["pts_penalidades"])
         
-        # Primero aplicar penalidades (bajan la linea)
-        if puntaje_data["pts_penalidades"] < 0:
-            puntos_acum += puntaje_data["pts_penalidades"]
+        # Primero aplicar penalidades reales del torneo (sin duplicar el ajuste manual inicial)
+        penalidades_restantes = puntaje_data["pts_penalidades"] - ajuste_manual_inicial
+        if penalidades_restantes < 0:
+            puntos_acum += penalidades_restantes
             evolucion.append({
                 "participante": part,
-                "fecha": pd.Timestamp("2026-07-19 12:00:00"),
+                "fecha": pd.Timestamp("2026-07-19 12:00:00", tz="UTC"),
                 "puntos": puntos_acum,
-                "evento": f"Penalidades: {puntaje_data['pts_penalidades']}",
+                "evento": f"Penalidades: {penalidades_restantes}",
             })
         
         # Despues aplicar bonos positivos
