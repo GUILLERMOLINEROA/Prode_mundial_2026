@@ -1,6 +1,7 @@
 import requests
 import streamlit as st
 import pandas as pd
+from zoneinfo import ZoneInfo
 
 API_BASE_URL = "https://v3.football.api-sports.io"
 WORLD_CUP_2026_ID = 1
@@ -48,6 +49,27 @@ ESTADO_DISPLAY = {
 
 ESTADOS_EN_VIVO = {"1H", "2H", "HT", "ET", "BT", "P", "LIVE"}
 ESTADOS_FINALIZADO = {"FT", "AET", "PEN"}
+
+TZ_MEXICO = ZoneInfo("America/Mexico_City")
+TZ_ARG = ZoneInfo("America/Argentina/Buenos_Aires")
+TZ_BR = ZoneInfo("America/Sao_Paulo")
+
+def formatear_horarios_partido(fecha):
+    """
+    Devuelve string compacto con horarios MX / AR / BR.
+    """
+    if fecha is None or pd.isna(fecha):
+        return ""
+    try:
+        dt = pd.to_datetime(fecha)
+        if getattr(dt, "tzinfo", None) is None:
+            dt = dt.tz_localize("UTC")
+        mx = dt.tz_convert(TZ_MEXICO).strftime("%d/%m %H:%M")
+        ar = dt.tz_convert(TZ_ARG).strftime("%d/%m %H:%M")
+        br = dt.tz_convert(TZ_BR).strftime("%d/%m %H:%M")
+        return f"🇲🇽 {mx} | 🇦🇷 {ar} | 🇧🇷 {br}"
+    except Exception:
+        return ""
 
 def estado_display(codigo):
     """Devuelve (emoji, texto) para un código de estado."""
@@ -97,8 +119,6 @@ def obtener_partidos_mundial():
                 "penales_visitante": fixture["score"]["penalty"]["away"],
                 "estado": fixture["fixture"]["status"]["short"],
                 "minuto": fixture["fixture"]["status"].get("elapsed"),
-                "estadio": (fixture.get("fixture", {}).get("venue", {}) or {}).get("name", ""),
-                "ciudad": (fixture.get("fixture", {}).get("venue", {}) or {}).get("city", ""),
                 "estadio": (fixture.get("fixture", {}).get("venue", {}) or {}).get("name", ""),
                 "ciudad": (fixture.get("fixture", {}).get("venue", {}) or {}).get("city", ""),
             })
