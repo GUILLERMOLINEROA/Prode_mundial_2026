@@ -87,6 +87,7 @@ def main():
 
     leaderboard = st.session_state["leaderboard"]
     resultados = st.session_state.get("resultados", pd.DataFrame())
+    apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
     campeon = st.session_state.get("campeon_real", "")
     tercero = st.session_state.get("tercero_real", "")
 
@@ -118,13 +119,58 @@ def main():
                 else:
                     lugar = "Sede por confirmar"
 
+                local = str(p["equipo_local"]).strip()
+                visitante = str(p["equipo_visitante"]).strip()
+
+                apostadores_local = []
+                apostadores_visitante = []
+                apostadores_empate = []
+
+                if apuestas_grupos is not None and not apuestas_grupos.empty:
+                    sub_match = apuestas_grupos[
+                        (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+                        (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+                    ].copy()
+
+                    for _, ap in sub_match.iterrows():
+                        nombre_ap = str(ap.get("participante", "")).strip()
+                        glp = ap.get("goles_local_pred")
+                        gvp = ap.get("goles_visitante_pred")
+
+                        if pd.isna(glp) or pd.isna(gvp):
+                            continue
+
+                        try:
+                            glp = int(glp)
+                            gvp = int(gvp)
+                        except Exception:
+                            continue
+
+                        if glp > gvp:
+                            apostadores_local.append(nombre_ap)
+                        elif gvp > glp:
+                            apostadores_visitante.append(nombre_ap)
+                        else:
+                            apostadores_empate.append(nombre_ap)
+
+                local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
+                visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
+                empate_txt = ", ".join(sorted(apostadores_empate)) if apostadores_empate else ""
+
+                empate_html = ""
+                if empate_txt:
+                    empate_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🤝 Empate: {empate_txt}</span>'
+
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
                     f'padding:10px; text-align:center;">'
                     f'<small style="color:#888;">{p["ronda"]}</small><br>'
-                    f'<b>{p["equipo_local"]}</b> vs <b>{p["equipo_visitante"]}</b><br>'
+                    f'<b>{local}</b> vs <b>{visitante}</b><br>'
                     f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {horarios_txt}</span><br>'
-                    f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span>'
+                    f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
+                    f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
+                    f'{empate_html}'
                     f'</div>',
                     unsafe_allow_html=True
                 )
