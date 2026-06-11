@@ -79,6 +79,19 @@ def main():
     st.markdown('<h1 class="titulo-prode">⚽ PRODE MUNDIALISTA 2026 ⚽</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; font-size:1.3rem; color:#aaa;">'
         'Donde las amistades se prueban y los egos se destruyen.</p>', unsafe_allow_html=True)
+
+    col_refresh_1, col_refresh_2, col_refresh_3 = st.columns([3, 2, 3])
+    with col_refresh_2:
+        if st.button("🔄 Refrescar vista", key="refresh_vista_mundial", use_container_width=True):
+            st.rerun()
+
+    st.markdown(
+        '<p style="text-align:center; color:#7C8C8D; font-size:0.85rem; margin-top:6px;">'
+        'Usa el cache normal de la API (50s). Si todavía no hay datos nuevos, vas a ver lo mismo.'
+        '</p>',
+        unsafe_allow_html=True
+    )
+
     st.divider()
 
     if not exito or "leaderboard" not in st.session_state:
