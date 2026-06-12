@@ -7,6 +7,7 @@ import os
 import random
 import streamlit as st
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 GEMINI_CACHE_TTL = 43200  # 3 horas en segundos
 
@@ -335,8 +336,14 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
     esp_max = config.get("participantes_esperados_max", 30)
 
     ahora = datetime.now(timezone.utc)
+    ahora_art = ahora.astimezone(ZoneInfo("America/Argentina/Buenos_Aires"))
     seed_hora = ahora.hour // 3
-    fecha_str = ahora.strftime("%d/%m/%Y") + f" (bloque {seed_hora})"  # Cambia cada 3 horas
+
+    # Clave interna para el cache de Gemini
+    fecha_cache = ahora.strftime("%d/%m/%Y") + f" (bloque {seed_hora})"
+
+    # Texto lindo para mostrar en la app
+    fecha_visible = ahora_art.strftime("%d/%m/%Y %H:%M ART")
 
     fecha_inaugural = datetime(2026, 6, 11, tzinfo=timezone.utc)
     dias_para_mundial = (fecha_inaugural - ahora).days
@@ -410,8 +417,8 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
                 row = leaderboard[leaderboard["Participante"] == nombre].iloc[0]
                 participantes_random_txt += f"- {nombre}: #{int(row['Posición'])} con {int(row['Total'])} pts\n"
 
-        return generar_bienvenida_competencia(
-            fecha_str,
+        resultado_comp = generar_bienvenida_competencia(
+            fecha_cache,
             ultimos_txt,
             vivos_txt,
             proximos_txt,
@@ -422,6 +429,9 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
             tono,
             seed_hora,
         )
+        if isinstance(resultado_comp, dict):
+            resultado_comp["analisis_generado_a"] = fecha_visible
+        return resultado_comp
 
     else:
         # MODO PREVIA
@@ -458,7 +468,7 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
             pass
 
         return generar_bienvenida_previa(
-            fecha_str, dias_para_mundial, len(participantes_data),
+            fecha_cache, dias_para_mundial, len(participantes_data),
             esp_min, esp_max, tuple(tuple(sorted(p.items())) for p in participantes_data),
             tuple(tuple(sorted(e.items())) for e in entregas_info),
             tono, seed_hora,
