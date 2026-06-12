@@ -214,44 +214,101 @@ Candidatos:
 def generar_bienvenida_competencia(
     fecha_str,
     ultimos_resultados,
+    partidos_en_vivo,
     proximos_partidos,
     top3_texto,
     ultimo_texto,
+    lider_actual,
     participantes_random_texto,
     tono_prompt,
     seed_hora,
 ):
     """
     Genera comentario de bienvenida para modo COMPETENCIA (mundial en curso).
-    Se cachea cada 3 horas.
+    Devuelve:
+    - bienvenida (texto largo de análisis)
+    - mensajes_dia (dict CODIGO -> comentario)
+    - analisis_generado_a (timestamp textual)
     """
     prompt = f"""{tono_prompt}
 
 Contexto del Mundial 2026 en vivo:
-- Fecha: {fecha_str}
+- Momento del análisis: {fecha_str}
+
+Partidos en vivo ahora:
+{partidos_en_vivo}
 
 Últimos resultados:
 {ultimos_resultados}
 
-Tabla de posiciones del PRODE:
-{top3_texto}
-Último: {ultimo_texto}
+Próximos partidos:
+{proximos_partidos}
 
-Participantes para mencionar:
+Tabla actual del PRODE:
+{top3_texto}
+Último actual: {ultimo_texto}
+Líder actual al momento del análisis: {lider_actual}
+
+Participantes a destacar:
 {participantes_random_texto}
 
-Generá UN párrafo de bienvenida (4-5 oraciones) que:
-- Comente los últimos resultados y cómo impactaron en el PRODE
-- Tire cargadas a los participantes mencionados según cómo les va
-- Mencione al líder y al último con tono picante
-- Anticipe lo que viene
+Generá DOS bloques separados por la línea "---":
+
+1. INTRO:
+Un análisis jugoso de 4 a 6 oraciones que:
+- diga explícitamente que es “al momento del análisis”
+- mencione si hay uno o varios partidos en vivo
+- si hay partidos en vivo, diga en qué estado estaban (1H, HT, 2H, etc.) y con qué marcador
+- diga quién iba liderando el PRODE con esos datos
+- mencione cómo impactaron los últimos resultados
+- anticipe lo que viene
+- mantenga el tono del grupo
+
+2. MENSAJES_DIA:
+Un comentario corto y picante para varios participantes importantes.
+Incluí al menos:
+- líder
+- segundo
+- tercero
+- último
+- y 1 o 2 participantes extra si querés
+
+Formato exacto:
+CODIGO: comentario
+CODIGO: comentario
 """
 
     texto = _llamar_gemini(prompt)
     if not texto:
-        return {"bienvenida": "⚽ El mundial está en vivo. Mirá cómo van las posiciones."}
+        return {
+            "bienvenida": "⚽ El mundial ya está en marcha. Mirá cómo se están moviendo las posiciones del PRODE con los resultados y partidos en vivo disponibles al momento del análisis.",
+            "mensajes_dia": {},
+            "analisis_generado_a": fecha_str,
+        }
 
-    return {"bienvenida": texto.strip()}
+    partes = texto.split("---")
+    bienvenida = partes[0].strip() if len(partes) >= 1 else ""
+    mensajes_raw = partes[1].strip() if len(partes) >= 2 else ""
+
+    for tag in ["INTRO:", "MENSAJES_DIA:", "1.", "2.", "1)", "2)"]:
+        bienvenida = bienvenida.replace(tag, "").strip()
+
+    mensajes_dia = {}
+    for linea in mensajes_raw.split("\n"):
+        linea = linea.strip()
+        if ":" in linea and len(linea) > 3:
+            cod, com = linea.split(":", 1)
+            cod = cod.strip().upper()
+            for tag in ["1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10.", "- "]:
+                cod = cod.replace(tag, "").strip()
+            if cod and com.strip():
+                mensajes_dia[cod] = com.strip()
+
+    return {
+        "bienvenida": bienvenida,
+        "mensajes_dia": mensajes_dia,
+        "analisis_generado_a": fecha_str,
+    }
 
 
 def _fallback_previa(dias, entregados, esp_min, esp_max):
@@ -286,43 +343,84 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
 
     # Detectar modo
     hay_resultados_reales = False
+    hay_partidos_en_vivo = False
     if resultados is not None and not resultados.empty:
-        from utils.api_football import ESTADOS_FINALIZADO
+        from utils.api_football import ESTADOS_FINALIZADO, ESTADOS_EN_VIVO
         if hasattr(resultados, "estado"):
             hay_resultados_reales = resultados["estado"].isin(ESTADOS_FINALIZADO).any()
+            hay_partidos_en_vivo = resultados["estado"].isin(ESTADOS_EN_VIVO).any()
 
-    usar_simulacion = st.session_state.get("usar_simulacion", True)
+    usar_simulacion = st.session_state.get("usar_simulacion", False)
 
-    if hay_resultados_reales and not usar_simulacion:
+    if (hay_resultados_reales or hay_partidos_en_vivo) and not usar_simulacion:
         # MODO COMPETENCIA
-        from utils.api_football import obtener_ultimos_resultados
+        from utils.api_football import obtener_ultimos_resultados, obtener_proximos_partidos, estado_display
+
         ultimos = obtener_ultimos_resultados(resultados, 3)
         ultimos_txt = ""
         if not ultimos.empty:
             for _, p in ultimos.iterrows():
                 ultimos_txt += f"- {p['equipo_local']} {int(p['goles_local'])}-{int(p['goles_visitante'])} {p['equipo_visitante']}\n"
 
+        vivos_txt = ""
+        if resultados is not None and not resultados.empty:
+            from utils.api_football import ESTADOS_EN_VIVO
+            en_vivo = resultados[resultados["estado"].isin(ESTADOS_EN_VIVO)].copy()
+            if not en_vivo.empty:
+                for _, p in en_vivo.head(3).iterrows():
+                    estado = str(p.get("estado", "") or "").strip()
+                    minuto = p.get("minuto")
+                    _, texto_estado = estado_display(estado)
+                    estado_txt = texto_estado
+                    if minuto is not None and pd.notna(minuto) and estado != "HT":
+                        estado_txt += f" · {int(minuto)}'"
+                    gl = int(p["goles_local"]) if pd.notna(p.get("goles_local")) else 0
+                    gv = int(p["goles_visitante"]) if pd.notna(p.get("goles_visitante")) else 0
+                    vivos_txt += f"- {p['equipo_local']} {gl}-{gv} {p['equipo_visitante']} ({estado_txt})\n"
+
+        proximos = obtener_proximos_partidos(resultados, 3)
+        proximos_txt = ""
+        if proximos is not None and not proximos.empty:
+            for _, p in proximos.iterrows():
+                try:
+                    ftxt = p["fecha"].strftime("%d/%m %H:%M")
+                except Exception:
+                    ftxt = str(p.get("fecha", ""))
+                proximos_txt += f"- {p['equipo_local']} vs {p['equipo_visitante']} ({ftxt})\n"
+
         top3_txt = ""
         ultimo_txt = ""
+        lider_actual = ""
         participantes_random_txt = ""
 
         if leaderboard is not None and not leaderboard.empty:
             for _, row in leaderboard.head(3).iterrows():
                 top3_txt += f"- #{int(row['Posición'])} {row['Participante']}: {int(row['Total'])} pts\n"
+
+            lider_row = leaderboard.iloc[0]
+            lider_actual = f"{lider_row['Participante']} con {int(lider_row['Total'])} pts"
+
             ultimo_row = leaderboard.iloc[-1]
             ultimo_txt = f"{ultimo_row['Participante']} con {int(ultimo_row['Total'])} pts"
 
-            # 2-3 aleatorios
             rng = random.Random(seed_hora)
             todos = leaderboard["Participante"].tolist()
-            mencionados = rng.sample(todos, min(3, len(todos)))
+            mencionados = rng.sample(todos, min(4, len(todos)))
             for nombre in mencionados:
                 row = leaderboard[leaderboard["Participante"] == nombre].iloc[0]
                 participantes_random_txt += f"- {nombre}: #{int(row['Posición'])} con {int(row['Total'])} pts\n"
 
         return generar_bienvenida_competencia(
-            fecha_str, ultimos_txt, "", top3_txt, ultimo_txt,
-            participantes_random_txt, tono, seed_hora,
+            fecha_str,
+            ultimos_txt,
+            vivos_txt,
+            proximos_txt,
+            top3_txt,
+            ultimo_txt,
+            lider_actual,
+            participantes_random_txt,
+            tono,
+            seed_hora,
         )
 
     else:

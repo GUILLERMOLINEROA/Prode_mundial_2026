@@ -104,6 +104,18 @@ def main():
     campeon = st.session_state.get("campeon_real", "")
     tercero = st.session_state.get("tercero_real", "")
 
+    bienvenida_data = {}
+    try:
+        from utils.bienvenida import obtener_bienvenida
+        categorias_todos_para_ia = st.session_state.get("categorias_todos", {})
+        bienvenida_data = obtener_bienvenida(
+            categorias_todos=categorias_todos_para_ia,
+            leaderboard=leaderboard,
+            resultados=resultados,
+        )
+    except Exception:
+        bienvenida_data = {}
+
     # =================================================================
     # CAMPEON + ULTIMOS RESULTADOS
     # =================================================================
@@ -355,6 +367,25 @@ def main():
                 </div>''', unsafe_allow_html=True)
 
     # =================================================================
+    # ANALISIS IA DEL MOMENTO
+    # =================================================================
+    if bienvenida_data:
+        intro_txt = str(bienvenida_data.get("bienvenida", "") or "").strip()
+        generado_txt = str(bienvenida_data.get("analisis_generado_a", "") or "").strip()
+        if intro_txt:
+            st.markdown("---")
+            st.markdown("### 🧠 Análisis del momento")
+            if generado_txt:
+                st.caption(f"Generado al momento del análisis: {generado_txt}")
+            st.markdown(
+                f'<div style="padding:14px 18px; background:linear-gradient(135deg, #1B2838, #2C3E50); '
+                f'border-left:3px solid #C8E600; border-radius:8px;">'
+                f'<p style="color:#E8EEF7; font-size:1rem; line-height:1.7; margin:0;">💬 {intro_txt}</p>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+    # =================================================================
     # TABLA COMPLETA CON SELECTOR DE COLUMNAS
     # =================================================================
     st.markdown("---")
@@ -472,10 +503,15 @@ def main():
     st.markdown("---")
     st.markdown("### 💬 Mensajes del Día")
     n = len(leaderboard)
+    mensajes_ia = bienvenida_data.get("mensajes_dia", {}) if isinstance(bienvenida_data, dict) else {}
+
     for _, row in leaderboard.iterrows():
         pos = int(row["Posición"])
+        nombre = row["Participante"]
         if pos <= 3 or pos >= n - 2:
-            msg = obtener_mensaje_posicion(row["Participante"], pos, n, int(row["Total"]))
+            msg = mensajes_ia.get(nombre, "")
+            if not msg:
+                msg = obtener_mensaje_posicion(nombre, pos, n, int(row["Total"]))
             st.markdown(f"> {msg}")
 
     # =================================================================
