@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from utils.data_loader import cargar_todo
-from utils.api_football import clasificar_ronda, estado_display, hay_partidos_en_vivo, ESTADOS_EN_VIVO, ESTADOS_FINALIZADO, formatear_horarios_partido, formatear_horarios_partido
+from utils.api_football import clasificar_ronda, estado_display, hay_partidos_en_vivo, ESTADOS_EN_VIVO, ESTADOS_FINALIZADO, formatear_horarios_partido
 
 st.set_page_config(page_title="Partidos", page_icon="📊", layout="wide")
 
@@ -19,12 +19,47 @@ def main():
     cargar_todo()
 
     resultados = st.session_state.get("resultados", pd.DataFrame())
+    apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
     if resultados.empty:
         st.warning("No hay resultados disponibles. Activa la simulacion o configura la API.")
         return
 
+    def etiqueta_ronda_visible(row):
+        """
+        Convierte Group Stage - X en Grupo A/B/C... usando apuestas_grupos.
+        Si no puede mapear, deja el texto original.
+        """
+        ronda_raw = str(row.get("ronda", "") or "").strip()
+        if not ronda_raw.lower().startswith("group stage"):
+            return ronda_raw
+
+        local = str(row.get("equipo_local", "") or "").strip()
+        visitante = str(row.get("equipo_visitante", "") or "").strip()
+
+        if apuestas_grupos is None or apuestas_grupos.empty:
+            return ronda_raw
+
+        sub = apuestas_grupos[
+            (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+            (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+        ]
+
+        if sub.empty:
+            sub = apuestas_grupos[
+                (apuestas_grupos["equipo_local"].astype(str).str.strip() == visitante) &
+                (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == local)
+            ]
+
+        if not sub.empty:
+            grupo = str(sub.iloc[0].get("grupo", "") or "").strip().upper()
+            if grupo:
+                return f"Grupo {grupo}"
+
+        return ronda_raw
+
     resultados = resultados.copy()
     resultados["ronda_interna"] = resultados["ronda"].apply(lambda x: clasificar_ronda(str(x)))
+    resultados["ronda_visible"] = resultados.apply(etiqueta_ronda_visible, axis=1)
 
     # --- Auto-refresh si hay partidos en vivo ---
     en_vivo = hay_partidos_en_vivo(resultados)
@@ -97,7 +132,7 @@ def main():
     # --- Filtros ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
-        rondas_opciones = ["Todas"] + sorted(resultados["ronda"].unique().tolist())
+        rondas_opciones = ["Todas"] + sorted(resultados["ronda_visible"].dropna().astype(str).unique().tolist())
         ronda_filtro = st.selectbox("🏆 Filtrar por ronda:", rondas_opciones)
     with col_f2:
         estado_map = {
@@ -113,7 +148,7 @@ def main():
     # Aplicar filtros
     df = resultados.copy()
     if ronda_filtro != "Todas":
-        df = df[df["ronda"] == ronda_filtro]
+        df = df[df["ronda_visible"] == ronda_filtro]
     estado_val = estado_map[estado_filtro]
     if estado_val is not None:
         df = df[df["estado"].isin(estado_val)]
