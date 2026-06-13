@@ -131,7 +131,7 @@ def main():
         gl = p["goles_local"]
         gv = p["goles_visitante"]
         estado = p["estado"]
-        ronda = p["ronda"]
+        ronda = etiqueta_ronda_visible(p)
         pl = p.get("penales_local")
         pv = p.get("penales_visitante")
         minuto = p.get("minuto")
