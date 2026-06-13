@@ -101,6 +101,7 @@ def main():
     leaderboard = st.session_state["leaderboard"]
     resultados = st.session_state.get("resultados", pd.DataFrame())
     apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
+    total_results_todos = st.session_state.get("total_results_todos", {})
     campeon = st.session_state.get("campeon_real", "")
     tercero = st.session_state.get("tercero_real", "")
 
@@ -155,6 +156,28 @@ def main():
                 return f"Grupo {grupo}"
 
         return ronda_raw
+
+    def ronda_prediccion_para_match(row):
+        """
+        Devuelve la ronda interna usada en equipos_por_ronda.
+        """
+        rr = str(row.get("ronda", "") or "").lower()
+
+        if "32" in rr:
+            return "16vos"
+        if "16" in rr:
+            return "8vos"
+        if "quarter" in rr:
+            return "4tos"
+        if "semi" in rr:
+            return "semis"
+        if "3rd" in rr or "third" in rr:
+            return "semis"
+        if "final" in rr:
+            return "final"
+
+        # si es de grupos, devolvemos vacío
+        return ""
 
     bienvenida_data = {}
     try:
@@ -308,52 +331,73 @@ def main():
                 apostadores_local = []
                 apostadores_visitante = []
                 apostadores_empate = []
+                apostadores_ninguno = []
 
-                if apuestas_grupos is not None and not apuestas_grupos.empty:
-                    sub_match = apuestas_grupos[
-                        (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
-                        (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
-                    ].copy()
+                ronda_visible = etiqueta_ronda_visible(p)
+                es_grupo = ronda_visible.startswith("Grupo ")
 
-                    for _, ap in sub_match.iterrows():
-                        nombre_ap = str(ap.get("participante", "")).strip()
-                        glp = ap.get("goles_local_pred")
-                        gvp = ap.get("goles_visitante_pred")
+                if es_grupo:
+                    if apuestas_grupos is not None and not apuestas_grupos.empty:
+                        sub_match = apuestas_grupos[
+                            (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+                            (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+                        ].copy()
 
-                        if pd.isna(glp) or pd.isna(gvp):
-                            continue
+                        for _, ap in sub_match.iterrows():
+                            nombre_ap = str(ap.get("participante", "")).strip()
+                            glp = ap.get("goles_local_pred")
+                            gvp = ap.get("goles_visitante_pred")
 
-                        try:
-                            glp = int(glp)
-                            gvp = int(gvp)
-                        except Exception:
-                            continue
+                            if pd.isna(glp) or pd.isna(gvp):
+                                continue
 
-                        if glp > gvp:
+                            try:
+                                glp = int(glp)
+                                gvp = int(gvp)
+                            except Exception:
+                                continue
+
+                            if glp > gvp:
+                                apostadores_local.append(nombre_ap)
+                            elif gvp > glp:
+                                apostadores_visitante.append(nombre_ap)
+                            else:
+                                apostadores_empate.append(nombre_ap)
+
+                    local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
+                    visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
+                    empate_txt = ", ".join(sorted(apostadores_empate)) if apostadores_empate else ""
+                    tercero_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🤝 Empate: {empate_txt}</span>' if empate_txt else ""
+                else:
+                    ronda_pred = ronda_prediccion_para_match(p)
+
+                    for nombre_ap, tr in total_results_todos.items():
+                        equipos_pred = set((tr.get("equipos_por_ronda", {}) or {}).get(ronda_pred, set()))
+                        tiene_local = local in equipos_pred
+                        tiene_visitante = visitante in equipos_pred
+
+                        if tiene_local:
                             apostadores_local.append(nombre_ap)
-                        elif gvp > glp:
+                        if tiene_visitante:
                             apostadores_visitante.append(nombre_ap)
-                        else:
-                            apostadores_empate.append(nombre_ap)
+                        if not tiene_local and not tiene_visitante:
+                            apostadores_ninguno.append(nombre_ap)
 
-                local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
-                visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
-                empate_txt = ", ".join(sorted(apostadores_empate)) if apostadores_empate else ""
-
-                empate_html = ""
-                if empate_txt:
-                    empate_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🤝 Empate: {empate_txt}</span>'
+                    local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
+                    visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
+                    ninguno_txt = ", ".join(sorted(apostadores_ninguno)) if apostadores_ninguno else "nadie"
+                    tercero_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🚫 Ninguno: {ninguno_txt}</span>'
 
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
                     f'padding:10px; text-align:center;">'
-                    f'<small style="color:#888;">{etiqueta_ronda_visible(p)}</small><br>'
+                    f'<small style="color:#888;">{ronda_visible}</small><br>'
                     f'<b>{local}</b> vs <b>{visitante}</b><br>'
                     f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {horarios_txt}</span><br>'
                     f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
-                    f'{empate_html}'
+                    f'{tercero_html}'
                     f'</div>',
                     unsafe_allow_html=True
                 )
