@@ -104,6 +104,39 @@ def main():
     campeon = st.session_state.get("campeon_real", "")
     tercero = st.session_state.get("tercero_real", "")
 
+    def etiqueta_ronda_visible(row):
+        """
+        Convierte 'Group Stage - X' en 'Grupo A/B/C...' usando el match real
+        contra apuestas_grupos. Si no puede mapear, deja el texto original.
+        """
+        ronda_raw = str(row.get("ronda", "") or "").strip()
+        if not ronda_raw.lower().startswith("group stage"):
+            return ronda_raw
+
+        local = str(row.get("equipo_local", "") or "").strip()
+        visitante = str(row.get("equipo_visitante", "") or "").strip()
+
+        if apuestas_grupos is None or apuestas_grupos.empty:
+            return ronda_raw
+
+        sub = apuestas_grupos[
+            (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+            (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+        ]
+
+        if sub.empty:
+            sub = apuestas_grupos[
+                (apuestas_grupos["equipo_local"].astype(str).str.strip() == visitante) &
+                (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == local)
+            ]
+
+        if not sub.empty:
+            grupo = str(sub.iloc[0].get("grupo", "") or "").strip().upper()
+            if grupo:
+                return f"Grupo {grupo}"
+
+        return ronda_raw
+
     bienvenida_data = {}
     try:
         from utils.bienvenida import obtener_bienvenida
@@ -295,7 +328,7 @@ def main():
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
                     f'padding:10px; text-align:center;">'
-                    f'<small style="color:#888;">{p["ronda"]}</small><br>'
+                    f'<small style="color:#888;">{etiqueta_ronda_visible(p)}</small><br>'
                     f'<b>{local}</b> vs <b>{visitante}</b><br>'
                     f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {horarios_txt}</span><br>'
                     f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
@@ -320,7 +353,7 @@ def main():
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; '
                     f'padding:10px; text-align:center;">'
-                    f'<small style="color:#888;">{p["ronda"]}</small><br>'
+                    f'<small style="color:#888;">{etiqueta_ronda_visible(p)}</small><br>'
                     f'<b>{p["equipo_local"]}</b> {gl}-{gv} <b>{p["equipo_visitante"]}</b>{pen}</div>',
                     unsafe_allow_html=True)
     st.divider()
