@@ -350,11 +350,87 @@ def main():
                 pen = ""
                 if pd.notna(p.get("penales_local")) and pd.notna(p.get("penales_visitante")):
                     pen = f" (Pen {int(p['penales_local'])}-{int(p['penales_visitante'])})"
+
+                ronda_visible = etiqueta_ronda_visible(p)
+                local = str(p["equipo_local"]).strip()
+                visitante = str(p["equipo_visitante"]).strip()
+
+                detalle_html = ""
+
+                # Si es fase de grupos, mostrar quién sumó +2 / +1 / +0
+                if ronda_visible.startswith("Grupo "):
+                    plus2 = []
+                    plus1 = []
+                    plus0 = []
+
+                    if apuestas_grupos is not None and not apuestas_grupos.empty:
+                        sub_match = apuestas_grupos[
+                            (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+                            (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+                        ].copy()
+
+                        resultado_real = "empate"
+                        if gl > gv:
+                            resultado_real = "local"
+                        elif gv > gl:
+                            resultado_real = "visitante"
+
+                        for _, ap in sub_match.iterrows():
+                            nombre_ap = str(ap.get("participante", "")).strip()
+                            glp = ap.get("goles_local_pred")
+                            gvp = ap.get("goles_visitante_pred")
+
+                            if pd.isna(glp) or pd.isna(gvp):
+                                continue
+
+                            try:
+                                glp = int(glp)
+                                gvp = int(gvp)
+                            except Exception:
+                                continue
+
+                            pts = 0
+                            resultado_pred = "empate"
+                            if glp > gvp:
+                                resultado_pred = "local"
+                            elif gvp > glp:
+                                resultado_pred = "visitante"
+
+                            if resultado_pred == resultado_real:
+                                pts += 1
+                            if glp == gl and gvp == gv:
+                                pts += 1
+
+                            if pts == 2:
+                                plus2.append(nombre_ap)
+                            elif pts == 1:
+                                plus1.append(nombre_ap)
+                            else:
+                                plus0.append(nombre_ap)
+
+                    plus2_txt = ", ".join(ordenar_codigos(plus2)) if plus2 else "nadie"
+                    plus1_txt = ", ".join(ordenar_codigos(plus1)) if plus1 else "nadie"
+                    plus0_txt = ", ".join(ordenar_codigos(plus0)) if plus0 else "nadie"
+
+                    detalle_html = (
+                        f'<br><span style="color:#C8E600; font-size:0.75rem;">✅ +2: {plus2_txt}</span>'
+                        f'<br><span style="color:#4A90D9; font-size:0.75rem;">➕ +1: {plus1_txt}</span>'
+                        f'<br><span style="color:#7C8C8D; font-size:0.75rem;">❌ +0: {plus0_txt}</span>'
+                    )
+                else:
+                    detalle_html = (
+                        f'<br><span style="color:#7C8C8D; font-size:0.75rem;">'
+                        f'🏟️ En eliminatorias el puntaje no depende del marcador, sino de quién hizo pasar a los equipos.'
+                        f'</span>'
+                    )
+
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; '
                     f'padding:10px; text-align:center;">'
-                    f'<small style="color:#888;">{etiqueta_ronda_visible(p)}</small><br>'
-                    f'<b>{p["equipo_local"]}</b> {gl}-{gv} <b>{p["equipo_visitante"]}</b>{pen}</div>',
+                    f'<small style="color:#888;">{ronda_visible}</small><br>'
+                    f'<b>{local}</b> {gl}-{gv} <b>{visitante}</b>{pen}'
+                    f'{detalle_html}'
+                    f'</div>',
                     unsafe_allow_html=True)
     st.divider()
 
