@@ -104,6 +104,25 @@ def main():
     campeon = st.session_state.get("campeon_real", "")
     tercero = st.session_state.get("tercero_real", "")
 
+    # Orden de entrega para ordenar listas de apostadores
+    orden_entrega = {}
+    try:
+        from utils.group_config import entregas_path
+        entregas_df = pd.read_csv(entregas_path())
+        entregas_df.columns = entregas_df.columns.str.strip()
+        for idx, row in entregas_df.iterrows():
+            codigo = str(row.get("codigo", "")).strip().upper()
+            if codigo:
+                orden_entrega[codigo] = idx
+    except Exception:
+        orden_entrega = {}
+
+    def ordenar_codigos(codigos):
+        return sorted(
+            codigos,
+            key=lambda x: (orden_entrega.get(str(x).strip().upper(), 9999), str(x))
+        )
+
     def etiqueta_ronda_visible(row):
         """
         Convierte 'Group Stage - X' en 'Grupo A/B/C...' usando el match real
