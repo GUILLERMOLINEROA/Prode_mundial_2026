@@ -21,6 +21,7 @@ if os.path.exists(css_path):
 def obtener_resultados():
     """Obtiene resultados del session_state o genera simulación."""
     resultados = st.session_state.get("resultados", pd.DataFrame())
+    apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
     if resultados.empty:
         usar_sim = st.toggle("🎮 Usar resultados simulados", value=True)
         if usar_sim:
@@ -139,6 +140,40 @@ def main():
     if resultados.empty:
         st.warning("⚠️ No hay resultados disponibles. Activá la simulación o configurá la API.")
         return
+
+    apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
+
+    def etiqueta_ronda_visible(row):
+        """
+        Convierte Group Stage - X en Grupo A/B/C... usando apuestas_grupos.
+        """
+        ronda_raw = str(row.get("ronda", "") or "").strip()
+        if not ronda_raw.lower().startswith("group stage"):
+            return ronda_raw
+
+        local = str(row.get("equipo_local", "") or "").strip()
+        visitante = str(row.get("equipo_visitante", "") or "").strip()
+
+        if apuestas_grupos is None or apuestas_grupos.empty:
+            return ronda_raw
+
+        sub = apuestas_grupos[
+            (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+            (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+        ]
+
+        if sub.empty:
+            sub = apuestas_grupos[
+                (apuestas_grupos["equipo_local"].astype(str).str.strip() == visitante) &
+                (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == local)
+            ]
+
+        if not sub.empty:
+            grupo = str(sub.iloc[0].get("grupo", "") or "").strip().upper()
+            if grupo:
+                return f"Grupo {grupo}"
+
+        return ronda_raw
     
     # --- Fase de Grupos ---
     st.markdown("---")
@@ -147,13 +182,16 @@ def main():
     partidos_grupos = obtener_partidos_ronda(resultados, "grupos")
     
     if not partidos_grupos.empty:
-        # Extraer grupos únicos
-        grupos = sorted(partidos_grupos["ronda"].unique())
+        partidos_grupos = partidos_grupos.copy()
+        partidos_grupos["ronda_visible"] = partidos_grupos.apply(etiqueta_ronda_visible, axis=1)
+
+        # Extraer grupos visibles únicos
+        grupos = sorted(partidos_grupos["ronda_visible"].dropna().astype(str).unique().tolist())
         
         # Selector de grupo
         grupo_sel = st.selectbox("Seleccioná un grupo:", grupos)
         
-        partidos_grupo = resultados[resultados["ronda"] == grupo_sel].reset_index(drop=True)
+        partidos_grupo = partidos_grupos[partidos_grupos["ronda_visible"] == grupo_sel].reset_index(drop=True)
         
         # Calcular tabla del grupo
         tabla = {}

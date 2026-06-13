@@ -213,7 +213,8 @@ Candidatos:
 
 @st.cache_data(ttl=GEMINI_CACHE_TTL)
 def generar_bienvenida_competencia(
-    fecha_str,
+    fecha_cache,
+    fecha_visible,
     ultimos_resultados,
     partidos_en_vivo,
     proximos_partidos,
@@ -234,7 +235,7 @@ def generar_bienvenida_competencia(
     prompt = f"""{tono_prompt}
 
 Contexto del Mundial 2026 en vivo:
-- Momento del análisis: {fecha_str}
+- Momento del análisis: {fecha_visible}
 
 Partidos en vivo ahora:
 {partidos_en_vivo}
@@ -284,7 +285,7 @@ CODIGO: comentario
         return {
             "bienvenida": "⚽ El mundial ya está en marcha. Mirá cómo se están moviendo las posiciones del PRODE con los resultados y partidos en vivo disponibles al momento del análisis.",
             "mensajes_dia": {},
-            "analisis_generado_a": fecha_str,
+            "analisis_generado_a": fecha_visible,
         }
 
     partes = texto.split("---")
@@ -308,7 +309,7 @@ CODIGO: comentario
     return {
         "bienvenida": bienvenida,
         "mensajes_dia": mensajes_dia,
-        "analisis_generado_a": fecha_str,
+        "analisis_generado_a": fecha_visible,
     }
 
 

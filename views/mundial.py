@@ -284,7 +284,7 @@ def main():
                 st.markdown(
                     f'<div style="background:#2a1a1a; border:1px solid #E74C3C; border-radius:8px; '
                     f'padding:16px; text-align:center;">'
-                    f'<small style="color:#FFB3B3; font-size:0.9rem;">{p["ronda"]}</small>'
+                    f'<small style="color:#FFB3B3; font-size:0.9rem;">{etiqueta_ronda_visible(p)}</small>'
                     f'<div style="margin:10px 0 6px 0; display:flex; justify-content:center; align-items:center; gap:14px; flex-wrap:wrap;">'
                     f'<span style="font-size:1.9rem; font-weight:800; color:#FFFFFF;">{local}</span>'
                     f'<span style="font-size:2.3rem; font-weight:900; color:#C8E600; letter-spacing:1px;">{gl}-{gv}</span>'
