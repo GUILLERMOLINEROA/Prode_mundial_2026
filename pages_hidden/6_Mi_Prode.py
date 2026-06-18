@@ -315,16 +315,21 @@ def main():
 
             df_show = pd.concat([en_vivo_df, proximos_df, jugados_df, resto_df], ignore_index=True)
 
-            # Mostrar arriba los últimos 3 resultados ya jugados
+            # Mostrar arriba: últimos 3 resultados y próximos 3 partidos
             ultimos_3 = jugados_df.head(3).copy()
-            if not ultimos_3.empty:
+            proximos_3 = proximos_df.head(3).copy()
+
+            col_left, col_right = st.columns(2)
+
+            with col_left:
                 st.markdown("### ⚡ Últimos 3 resultados")
-                cols_ult = st.columns(min(3, len(ultimos_3)))
-                for i, (_, rr) in enumerate(ultimos_3.iterrows()):
-                    with cols_ult[i]:
+                if ultimos_3.empty:
+                    st.info("Todavía no hay resultados jugados para mostrar.")
+                else:
+                    for _, rr in ultimos_3.iterrows():
                         st.markdown(
                             f'<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; '
-                            f'padding:10px; text-align:center;">'
+                            f'padding:10px; text-align:center; margin-bottom:10px;">'
                             f'<small style="color:#888;">{rr["Partido"]}</small><br>'
                             f'<span style="color:#AEC6CF; font-size:0.85rem;">Tu apuesta</span><br>'
                             f'<b>{rr["Predicción"]}</b><br>'
@@ -335,7 +340,26 @@ def main():
                             unsafe_allow_html=True
                         )
 
-                st.markdown("---")
+            with col_right:
+                st.markdown("### 🗓️ Próximos 3 partidos")
+                if proximos_3.empty:
+                    st.info("No hay próximos partidos para mostrar.")
+                else:
+                    for _, rr in proximos_3.iterrows():
+                        st.markdown(
+                            f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
+                            f'padding:10px; text-align:center; margin-bottom:10px;">'
+                            f'<small style="color:#888;">{rr["Partido"]}</small><br>'
+                            f'<span style="color:#AEC6CF; font-size:0.85rem;">Tu apuesta</span><br>'
+                            f'<b>{rr["Predicción"]}</b><br>'
+                            f'<span style="color:#AEC6CF; font-size:0.85rem;">Estado actual</span><br>'
+                            f'<b>{rr["Estado API"]}</b><br>'
+                            f'<span style="color:#7C8C8D; font-size:0.8rem;">{rr["Fecha real"]}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+
+            st.markdown("---")
 
             # Ocultar columnas auxiliares antes de mostrar
             df_show = df_show.drop(
