@@ -613,43 +613,83 @@ def main():
     # GRAFICO DE BARRAS CON PENALIDADES
     # =================================================================
     st.markdown("### 📊 Desglose de Puntos")
+
+    modo_grafico = st.radio(
+        "Vista del gráfico:",
+        ["Resumido", "Detallado"],
+        horizontal=True,
+        key="modo_grafico_puntos"
+    )
+
     fig = go.Figure()
 
-    categorias_barras = [
-        ("Grupos", "#C8E600"), ("Eliminatorias", "#4A90D9"),
-        ("Campeón", "#E67E22"), ("3ero", "#F39C12"), ("Especiales", "#9B59B6")
-    ]
+    if modo_grafico == "Resumido":
+        categorias_barras = [
+            ("Grupos", "#C8E600"),
+            ("Eliminatorias", "#4A90D9"),
+            ("Campeón", "#E67E22"),
+            ("3ero", "#F39C12"),
+            ("Especiales", "#9B59B6"),
+        ]
+    else:
+        categorias_barras = [
+            ("Grupos L/E/V", "#7ED957"),
+            ("Grupos Exacto", "#C8E600"),
+            ("Eliminatorias", "#4A90D9"),
+            ("Campeón", "#E67E22"),
+            ("3ero", "#F39C12"),
+            ("Especiales", "#9B59B6"),
+        ]
+
+    # Solo usar columnas que realmente existan
+    categorias_barras = [(cat, color) for cat, color in categorias_barras if cat in leaderboard.columns]
 
     for cat_idx, (cat, color) in enumerate(categorias_barras):
         bases = []
         for _, row in leaderboard.iterrows():
-            pen = float(row["Penalidades"])
+            pen = float(row["Penalidades"]) if "Penalidades" in leaderboard.columns else 0.0
             base = pen
             for prev_cat, _ in categorias_barras[:cat_idx]:
-                base += float(row[prev_cat])
+                if prev_cat in leaderboard.columns:
+                    base += float(row[prev_cat])
             bases.append(base)
+
         fig.add_trace(go.Bar(
-            x=leaderboard["Participante"], y=leaderboard[cat],
-            base=bases, name=cat, marker_color=color,
+            x=leaderboard["Participante"],
+            y=leaderboard[cat],
+            base=bases,
+            name=cat,
+            marker_color=color,
             hovertemplate="<b>%{x}</b><br>" + cat + ": %{y}<extra></extra>",
         ))
 
-    for _, row in leaderboard.iterrows():
-        pen = int(row["Penalidades"])
-        if pen < 0:
-            fig.add_annotation(
-                x=row["Participante"], y=pen / 2,
-                text=f"<b>{pen}</b>", showarrow=False,
-                font=dict(color="#E74C3C", size=11, family="Arial Black"),
-            )
+    if "Penalidades" in leaderboard.columns:
+        for _, row in leaderboard.iterrows():
+            pen = int(row["Penalidades"])
+            if pen < 0:
+                fig.add_annotation(
+                    x=row["Participante"],
+                    y=pen / 2,
+                    text=f"<b>{pen}</b>",
+                    showarrow=False,
+                    font=dict(color="#E74C3C", size=11, family="Arial Black"),
+                )
 
     fig.update_layout(
-        barmode="overlay", template="plotly_dark", height=550,
-        xaxis_title="Participante", yaxis_title="Puntos",
+        barmode="overlay",
+        template="plotly_dark",
+        height=550,
+        xaxis_title="Participante",
+        yaxis_title="Puntos",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        yaxis=dict(zeroline=True, zerolinecolor="rgba(255,255,255,0.4)", zerolinewidth=2),
+        yaxis=dict(
+            zeroline=True,
+            zerolinecolor="rgba(255,255,255,0.4)",
+            zerolinewidth=2
+        ),
         bargap=0.3,
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
     # Comentario toxico para penalizados

@@ -284,7 +284,7 @@ def main():
                 st.markdown(
                     f'<div style="background:#2a1a1a; border:1px solid #E74C3C; border-radius:8px; '
                     f'padding:16px; text-align:center;">'
-                    f'<small style="color:#FFB3B3; font-size:0.9rem;">{p["ronda"]}</small>'
+                    f'<small style="color:#FFB3B3; font-size:0.9rem;">{etiqueta_ronda_visible(p)}</small>'
                     f'<div style="margin:10px 0 6px 0; display:flex; justify-content:center; align-items:center; gap:14px; flex-wrap:wrap;">'
                     f'<span style="font-size:1.9rem; font-weight:800; color:#FFFFFF;">{local}</span>'
                     f'<span style="font-size:2.3rem; font-weight:900; color:#C8E600; letter-spacing:1px;">{gl}-{gv}</span>'
@@ -613,43 +613,83 @@ def main():
     # GRAFICO DE BARRAS CON PENALIDADES
     # =================================================================
     st.markdown("### 📊 Desglose de Puntos")
+
+    modo_grafico = st.radio(
+        "Vista del gráfico:",
+        ["Resumido", "Detallado"],
+        horizontal=True,
+        key="modo_grafico_puntos"
+    )
+
     fig = go.Figure()
 
-    categorias_barras = [
-        ("Grupos", "#C8E600"), ("Eliminatorias", "#4A90D9"),
-        ("Campeón", "#E67E22"), ("3ero", "#F39C12"), ("Especiales", "#9B59B6")
-    ]
+    if modo_grafico == "Resumido":
+        categorias_barras = [
+            ("Grupos", "#C8E600"),
+            ("Eliminatorias", "#4A90D9"),
+            ("Campeón", "#E67E22"),
+            ("3ero", "#F39C12"),
+            ("Especiales", "#9B59B6"),
+        ]
+    else:
+        categorias_barras = [
+            ("Grupos L/E/V", "#7ED957"),
+            ("Grupos Exacto", "#C8E600"),
+            ("Eliminatorias", "#4A90D9"),
+            ("Campeón", "#E67E22"),
+            ("3ero", "#F39C12"),
+            ("Especiales", "#9B59B6"),
+        ]
+
+    # Solo usar columnas que realmente existan
+    categorias_barras = [(cat, color) for cat, color in categorias_barras if cat in leaderboard.columns]
 
     for cat_idx, (cat, color) in enumerate(categorias_barras):
         bases = []
         for _, row in leaderboard.iterrows():
-            pen = float(row["Penalidades"])
+            pen = float(row["Penalidades"]) if "Penalidades" in leaderboard.columns else 0.0
             base = pen
             for prev_cat, _ in categorias_barras[:cat_idx]:
-                base += float(row[prev_cat])
+                if prev_cat in leaderboard.columns:
+                    base += float(row[prev_cat])
             bases.append(base)
+
         fig.add_trace(go.Bar(
-            x=leaderboard["Participante"], y=leaderboard[cat],
-            base=bases, name=cat, marker_color=color,
+            x=leaderboard["Participante"],
+            y=leaderboard[cat],
+            base=bases,
+            name=cat,
+            marker_color=color,
             hovertemplate="<b>%{x}</b><br>" + cat + ": %{y}<extra></extra>",
         ))
 
-    for _, row in leaderboard.iterrows():
-        pen = int(row["Penalidades"])
-        if pen < 0:
-            fig.add_annotation(
-                x=row["Participante"], y=pen / 2,
-                text=f"<b>{pen}</b>", showarrow=False,
-                font=dict(color="#E74C3C", size=11, family="Arial Black"),
-            )
+    if "Penalidades" in leaderboard.columns:
+        for _, row in leaderboard.iterrows():
+            pen = int(row["Penalidades"])
+            if pen < 0:
+                fig.add_annotation(
+                    x=row["Participante"],
+                    y=pen / 2,
+                    text=f"<b>{pen}</b>",
+                    showarrow=False,
+                    font=dict(color="#E74C3C", size=11, family="Arial Black"),
+                )
 
     fig.update_layout(
-        barmode="overlay", template="plotly_dark", height=550,
-        xaxis_title="Participante", yaxis_title="Puntos",
+        barmode="overlay",
+        template="plotly_dark",
+        height=550,
+        xaxis_title="Participante",
+        yaxis_title="Puntos",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        yaxis=dict(zeroline=True, zerolinecolor="rgba(255,255,255,0.4)", zerolinewidth=2),
+        yaxis=dict(
+            zeroline=True,
+            zerolinecolor="rgba(255,255,255,0.4)",
+            zerolinewidth=2
+        ),
         bargap=0.3,
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
     # Comentario toxico para penalizados
