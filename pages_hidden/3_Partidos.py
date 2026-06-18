@@ -152,8 +152,20 @@ def main():
     estado_val = estado_map[estado_filtro]
     if estado_val is not None:
         df = df[df["estado"].isin(estado_val)]
+    ahora = pd.Timestamp.now(tz="UTC")
+
     if orden == "Más recientes primero":
-        df = df.sort_values("fecha", ascending=False)
+        # Primero mostrar partidos ya jugados o en curso, del más reciente al más viejo.
+        # Después mostrar los futuros, del más cercano al más lejano.
+        df = df.copy()
+        df["_ya_ocurrio"] = df["fecha"] <= ahora
+        df["_fecha_invertida"] = df["fecha"]
+
+        ya_ocurridos = df[df["_ya_ocurrio"]].sort_values("fecha", ascending=False)
+        futuros = df[~df["_ya_ocurrio"]].sort_values("fecha", ascending=True)
+
+        df = pd.concat([ya_ocurridos, futuros], ignore_index=True)
+        df = df.drop(columns=["_ya_ocurrio", "_fecha_invertida"], errors="ignore")
     else:
         df = df.sort_values("fecha", ascending=True)
 
