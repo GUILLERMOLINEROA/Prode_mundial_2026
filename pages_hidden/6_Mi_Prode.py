@@ -207,6 +207,9 @@ def main():
                     r["equipo_local"], r["equipo_visitante"], resultados
                 )
 
+                estado_raw = str(real_row.get("estado", "")).strip() if real_row is not None else ""
+                fecha_sort = real_row.get("fecha") if real_row is not None else pd.NaT
+
                 filas.append({
                     "Partido": r["partido_id"],
                     "Predicción": _resultado_predicho_completo(
@@ -225,6 +228,8 @@ def main():
                     "Fecha real": _fecha_real_texto(real_row),
                     "_Local": str(r["equipo_local"]),
                     "_Visitante": str(r["equipo_visitante"]),
+                    "_EstadoRaw": estado_raw,
+                    "_FechaSort": fecha_sort,
                 })
 
             df_show = pd.DataFrame(filas)
@@ -263,8 +268,80 @@ def main():
                     (df_show["_Visitante"].astype(str) == filtro_equipo)
                 ]
 
+            # Orden inteligente por relevancia temporal:
+            # 1) en vivo
+            # 2) próximos (más cercanos primero)
+            # 3) ya jugados (más recientes primero)
+            # 4) sin fecha al final
+            ahora = pd.Timestamp.now(tz="UTC")
+
+            df_show["_FechaSort"] = pd.to_datetime(df_show["_FechaSort"], errors="coerce", utc=True)
+
+            estados_vivo = {"1H", "HT", "2H", "ET", "P", "LIVE"}
+            estados_jugado = {"FT", "AET", "PEN"}
+
+            def _priority_row(row):
+                estado = str(row.get("_EstadoRaw", "") or "").strip()
+                fecha = row.get("_FechaSort")
+
+                if estado in estados_vivo:
+                    return 0
+                if estado == "NS" and pd.notna(fecha):
+                    return 1
+                if estado in estados_jugado and pd.notna(fecha):
+                    return 2
+                return 3
+
+            def _sort_ts(row):
+                estado = str(row.get("_EstadoRaw", "") or "").strip()
+                fecha = row.get("_FechaSort")
+
+                if pd.isna(fecha):
+                    return pd.Timestamp.max.tz_localize("UTC")
+
+                # próximos -> ascendente
+                if estado == "NS":
+                    return fecha
+
+                # jugados -> descendente (invertimos luego con negativo no sirve para ts, manejamos aparte)
+                return fecha
+
+            df_show["_priority"] = df_show.apply(_priority_row, axis=1)
+
+            en_vivo_df = df_show[df_show["_priority"] == 0].sort_values("_FechaSort", ascending=True)
+            proximos_df = df_show[df_show["_priority"] == 1].sort_values("_FechaSort", ascending=True)
+            jugados_df = df_show[df_show["_priority"] == 2].sort_values("_FechaSort", ascending=False)
+            resto_df = df_show[df_show["_priority"] == 3].sort_values("Partido", ascending=True)
+
+            df_show = pd.concat([en_vivo_df, proximos_df, jugados_df, resto_df], ignore_index=True)
+
+            # Mostrar arriba los últimos 3 resultados ya jugados
+            ultimos_3 = jugados_df.head(3).copy()
+            if not ultimos_3.empty:
+                st.markdown("### ⚡ Últimos 3 resultados")
+                cols_ult = st.columns(min(3, len(ultimos_3)))
+                for i, (_, rr) in enumerate(ultimos_3.iterrows()):
+                    with cols_ult[i]:
+                        st.markdown(
+                            f'<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; '
+                            f'padding:10px; text-align:center;">'
+                            f'<small style="color:#888;">{rr["Partido"]}</small><br>'
+                            f'<span style="color:#AEC6CF; font-size:0.85rem;">Tu apuesta</span><br>'
+                            f'<b>{rr["Predicción"]}</b><br>'
+                            f'<span style="color:#AEC6CF; font-size:0.85rem;">Resultado real</span><br>'
+                            f'<b>{rr["Resultado real"]}</b><br>'
+                            f'<span style="color:#7C8C8D; font-size:0.8rem;">{rr["Estado API"]} · {rr["Fecha real"]}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+
+                st.markdown("---")
+
             # Ocultar columnas auxiliares antes de mostrar
-            df_show = df_show.drop(columns=["_Local", "_Visitante"], errors="ignore")
+            df_show = df_show.drop(
+                columns=["_Local", "_Visitante", "_EstadoRaw", "_FechaSort", "_priority"],
+                errors="ignore"
+            )
 
             st.dataframe(df_show, use_container_width=True, hide_index=True)
 
