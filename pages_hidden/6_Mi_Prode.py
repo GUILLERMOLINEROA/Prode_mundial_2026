@@ -223,22 +223,48 @@ def main():
                         str(r["equipo_visitante"]),
                     ),
                     "Fecha real": _fecha_real_texto(real_row),
+                    "_Local": str(r["equipo_local"]),
+                    "_Visitante": str(r["equipo_visitante"]),
                 })
 
             df_show = pd.DataFrame(filas)
 
             # El grupo ya está implícito en el código de partido (GA1, GB2, etc.)
-            # así que usamos eso para filtrar sin necesitar columna "Grupo".
             grupos_disponibles = sorted(df_show["Partido"].astype(str).str[1].dropna().unique().tolist())
 
-            filtro_grupo = st.selectbox(
-                "Filtrar grupo:",
-                ["Todos"] + grupos_disponibles,
-                key="filtro_mi_prode_grupos"
+            # Filtro por equipo (local o visitante)
+            equipos_disponibles = sorted(
+                set(df_show["_Local"].dropna().astype(str).tolist()) |
+                set(df_show["_Visitante"].dropna().astype(str).tolist())
             )
+
+            col_f1, col_f2 = st.columns(2)
+
+            with col_f1:
+                filtro_grupo = st.selectbox(
+                    "Filtrar grupo:",
+                    ["Todos"] + grupos_disponibles,
+                    key="filtro_mi_prode_grupos"
+                )
+
+            with col_f2:
+                filtro_equipo = st.selectbox(
+                    "Filtrar equipo:",
+                    ["Todos"] + equipos_disponibles,
+                    key="filtro_mi_prode_equipo"
+                )
 
             if filtro_grupo != "Todos":
                 df_show = df_show[df_show["Partido"].astype(str).str[1] == filtro_grupo]
+
+            if filtro_equipo != "Todos":
+                df_show = df_show[
+                    (df_show["_Local"].astype(str) == filtro_equipo) |
+                    (df_show["_Visitante"].astype(str) == filtro_equipo)
+                ]
+
+            # Ocultar columnas auxiliares antes de mostrar
+            df_show = df_show.drop(columns=["_Local", "_Visitante"], errors="ignore")
 
             st.dataframe(df_show, use_container_width=True, hide_index=True)
 
