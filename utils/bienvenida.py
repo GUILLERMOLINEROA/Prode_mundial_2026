@@ -9,7 +9,7 @@ import streamlit as st
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-GEMINI_CACHE_TTL = 43200  # 3 horas en segundos
+GEMINI_CACHE_TTL = 43200  # 12 horas en segundos (solo cachea respuestas exitosas de Gemini)
 
 
 def _get_gemini_key():
@@ -19,22 +19,64 @@ def _get_gemini_key():
         return os.environ.get("GEMINI_API_KEY", "")
 
 
+# Guarda el ultimo error de Gemini para poder mostrarlo en modo debug.
+# Es un global de modulo (no st.session_state) porque _llamar_gemini corre
+# dentro de funciones cacheadas, donde escribir en session_state es problematico.
+_ULTIMO_ERROR_GEMINI = ""
+
+
+def ultimo_error_gemini():
+    """Devuelve el ultimo error de Gemini (string vacio si la ultima llamada fue OK)."""
+    return _ULTIMO_ERROR_GEMINI
+
+
 def _llamar_gemini(prompt):
-    """Llama a Gemini y retorna el texto. Retorna '' si falla."""
+    """Llama a Gemini y retorna el texto. Retorna '' si falla (y deja rastro en logs)."""
+    global _ULTIMO_ERROR_GEMINI
     key = _get_gemini_key()
     if not key:
+        _ULTIMO_ERROR_GEMINI = "Sin GEMINI_API_KEY"
+        print("[Gemini] Sin GEMINI_API_KEY (ni en secrets ni en entorno)")
         return ""
     try:
         import google.generativeai as genai
         genai.configure(api_key=key)
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
-        return response.text.strip()
+        # Respuesta sin candidates = bloqueada o vacia. Acceder a .text lanzaria.
+        if not getattr(response, "candidates", None):
+            fb = getattr(response, "prompt_feedback", "")
+            _ULTIMO_ERROR_GEMINI = f"Respuesta sin candidates (feedback={fb})"
+            print(f"[Gemini] Sin candidates. prompt_feedback={fb}")
+            return ""
+        texto = (response.text or "").strip()
+        _ULTIMO_ERROR_GEMINI = ""  # exito
+        print(f"[Gemini] OK ({len(texto)} chars)")
+        return texto
     except Exception as e:
+        _ULTIMO_ERROR_GEMINI = f"{type(e).__name__}: {e}"
+        print(f"[Gemini] ERROR -> {type(e).__name__}: {e}")
         return ""
 
 
-@st.cache_data(ttl=GEMINI_CACHE_TTL)
+class _GeminiVacio(Exception):
+    """Marca interna: Gemini no devolvio texto. Sirve para NO cachear el fallback."""
+
+
+@st.cache_data(ttl=GEMINI_CACHE_TTL, show_spinner=False)
+def _gemini_cacheado(prompt, _seed):
+    """
+    Llama a Gemini y cachea SOLO respuestas exitosas.
+    Si Gemini falla, levanta _GeminiVacio: st.cache_data no cachea excepciones,
+    asi un fallo transitorio no queda pegado las 12h del TTL.
+    El parametro _seed rota la clave de cache cada 3 horas.
+    """
+    texto = _llamar_gemini(prompt)
+    if not texto:
+        raise _GeminiVacio()
+    return texto
+
+
 def generar_bienvenida_previa(
     fecha_str,
     dias_para_mundial,
@@ -156,7 +198,10 @@ Candidatos:
 {muro_candidatos_txt}
 """
 
-    texto = _llamar_gemini(prompt)
+    try:
+        texto = _gemini_cacheado(prompt, seed_hora)
+    except Exception:
+        texto = ""
     if not texto:
         return _fallback_previa(dias_para_mundial, total_entregados, esperados_min, esperados_max)
 
@@ -211,7 +256,6 @@ Candidatos:
     return {"bienvenida": bienvenida, "footer": footer, "veredictos": veredictos, "delirios": delirios, "muro": muro}
 
 
-@st.cache_data(ttl=GEMINI_CACHE_TTL)
 def generar_bienvenida_competencia(
     fecha_cache,
     fecha_visible,
@@ -280,7 +324,10 @@ CODIGO: comentario
 CODIGO: comentario
 """
 
-    texto = _llamar_gemini(prompt)
+    try:
+        texto = _gemini_cacheado(prompt, seed_hora)
+    except Exception:
+        texto = ""
     if not texto:
         return {
             "bienvenida": "⚽ El mundial ya está en marcha. Mirá cómo se están moviendo las posiciones del PRODE con los resultados y partidos en vivo disponibles al momento del análisis.",
