@@ -5,6 +5,7 @@ Dos modos: PREVIA (antes del mundial) y COMPETENCIA (durante el mundial).
 """
 import os
 import random
+import pandas as pd
 import streamlit as st
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -486,6 +487,7 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
 
         resultado_comp = generar_bienvenida_competencia(
             fecha_cache,
+            fecha_visible,
             ultimos_txt,
             vivos_txt,
             proximos_txt,
@@ -521,7 +523,6 @@ def obtener_bienvenida(categorias_todos=None, leaderboard=None, resultados=None)
         # Preparar datos de entregas
         entregas_info = []
         try:
-            import pandas as pd
             from utils.group_config import entregas_path
             edf = pd.read_csv(entregas_path())
             edf.columns = edf.columns.str.strip()
