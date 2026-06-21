@@ -332,6 +332,12 @@ def main():
         test_all = True
         print(f"\n🧪 MODO TEST-ALL — Enviando TODOS los mails a: {test_email}\n")
 
+    # Protección: grupos con emails_activos=false no reciben mails automáticos
+    if not group_config().get("emails_activos", True):
+        print("   ℹ️ Este grupo tiene emails_activos=false.")
+        print("   No se envían mails automáticos para este grupo.")
+        return
+
     # 1. Cargar datos
     print("\n1. Cargando participantes...")
     participantes_info = cargar_participantes_info()

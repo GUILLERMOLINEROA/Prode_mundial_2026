@@ -77,6 +77,21 @@ def _gemini_cacheado(prompt, _seed):
     return texto
 
 
+@st.cache_data(ttl=GEMINI_CACHE_TTL, show_spinner=False)
+def _gemini_cacheado_competencia(_prompt, bucket):
+    """
+    Igual que _gemini_cacheado pero la clave de cache es SOLO 'bucket' (ventana de
+    tiempo): el prompt va con guion bajo, asi st.cache_data lo ignora al hashear.
+    Resultado: en modo competencia el analisis se regenera a lo sumo 1 vez por
+    ventana, aunque cambien los marcadores en vivo (controla costo). Solo cachea
+    respuestas exitosas (levanta _GeminiVacio si falla, no se cachea el fallback).
+    """
+    texto = _llamar_gemini(_prompt)
+    if not texto:
+        raise _GeminiVacio()
+    return texto
+
+
 def generar_bienvenida_previa(
     fecha_str,
     dias_para_mundial,
@@ -324,8 +339,12 @@ CODIGO: comentario
 CODIGO: comentario
 """
 
+    # Tope de costo: en competencia regeneramos a lo sumo 1 vez cada 2 horas,
+    # aunque cambien los marcadores en vivo. La clave de cache es la ventana de 2h.
+    ahora = datetime.now(timezone.utc)
+    bucket_2h = ahora.strftime("%Y%m%d") + "-h" + str(ahora.hour // 2)
     try:
-        texto = _gemini_cacheado(prompt, seed_hora)
+        texto = _gemini_cacheado_competencia(prompt, bucket_2h)
     except Exception:
         texto = ""
     if not texto:
