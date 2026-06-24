@@ -427,27 +427,17 @@ def main():
     if not ultimos.empty:
         st.markdown("#### ⚡ Últimos Resultados")
 
-        # --- "Pasa a 16avos": clasificados (provisionales) desde standings oficiales ---
-        # DOBLE FUENTE (a propósito):
-        #   - La tarjeta DERIVA "pasa a 16avos" de los STANDINGS (1º/2º + 8 mejores
-        #     terceros), vía obtener_equipos_clasificados_16avos() — misma función
-        #     que usa la condición de Decepción. Es informativo/provisional.
-        #   - El +1 REAL que entra al leaderboard lo otorga el scoring desde los
-        #     FIXTURES de 16avos de la API (extraer_equipos_reales_por_ronda en
-        #     data_loader.py). Son fuentes DISTINTAS: pueden discrepar en una ventana
-        #     corta (grupos ya cerrados en standings, pero cuadro de 16avos todavía
-        #     sin poblar). Es tolerable porque la línea de la tarjeta es provisional.
-        #   - REQUIERE VALIDACIÓN CONTRA STANDINGS REALES DURANTE EL TORNEO 2026.
+        # --- "Pasa a 16avos" desde el CUADRO REAL de la API ---
+        # MISMA fuente que el +1 del leaderboard (extraer_equipos_reales_por_ronda):
+        # la línea solo aparece cuando la API ya publicó la Round of 32 (set NO
+        # vacío), nunca desde standings provisionales. Durante la fase de grupos no
+        # aparece; al cerrar y publicarse el cuadro, la tarjeta muestra el +1 real.
+        # Así la tarjeta no promete un +1 que el scoring no está sumando.
         from utils.scoring import PUNTOS as _PUNTOS_16
         try:
-            from utils.special_categories import (
-                grupos_finalizados as _grupos_fin,
-                obtener_equipos_clasificados_16avos as _clasificados_16avos_fn,
-            )
-            grupos_cerrados = bool(_grupos_fin(resultados))
-            clasificados_16avos = _clasificados_16avos_fn(resultados)
+            from utils.data_loader import extraer_equipos_reales_por_ronda
+            clasificados_16avos = set(extraer_equipos_reales_por_ronda(resultados).get("16vos", set()))
         except Exception:
-            grupos_cerrados = False
             clasificados_16avos = set()
 
         cols_res = st.columns(3)
@@ -525,15 +515,14 @@ def main():
                         f'<br><span style="color:#7C8C8D; font-size:0.75rem;">❌ +0: {plus0_txt}</span>'
                     )
 
-                    # "Pasa a 16avos (+1)": solo para los equipos del partido que ya clasifican.
-                    suf_prov = "" if grupos_cerrados else ", provisional"
+                    # "Pasa a 16avos (+1)": solo equipos del partido en el cuadro real.
                     for eq_card in (local, visitante):
                         if eq_card in clasificados_16avos:
                             cods = quienes_pasan_a_16avos(eq_card)
                             cods_txt = ", ".join(cods) if cods else "nadie"
                             detalle_html += (
                                 f'<br><span style="color:#7ED957; font-size:0.75rem;">'
-                                f'🎟️ {eq_card} pasa a 16avos (+{_PUNTOS_16["16vos"]}{suf_prov}): {cods_txt}</span>'
+                                f'🎟️ {eq_card} pasa a 16avos (+{_PUNTOS_16["16vos"]}): {cods_txt}</span>'
                             )
                 else:
                     detalle_html = (

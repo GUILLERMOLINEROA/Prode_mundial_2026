@@ -55,16 +55,17 @@ def obtener_equipos_clasificados_16avos(resultados=None):
     Set de equipos clasificados a 16avos según los STANDINGS oficiales:
     12 primeros + 12 segundos + 8 mejores terceros.
 
-    DOS MODOS, según `resultados` (vía grupos_finalizados):
+    Modos según `resultados` (vía grupos_finalizados):
       - PROVISIONAL (grupos en curso): solo 1º y 2º de cada grupo. SIN terceros
         (el corte de los 8 mejores no tiene sentido hasta cerrar los 12 grupos).
       - DEFINITIVO (grupos cerrados): los 32 (1º + 2º + 8 mejores terceros).
 
-    Fuente única y compartida por TRES callers, sin que uno pise al otro:
-      - tarjetas de "pasa a 16avos" (provisional/definitivo según el momento);
-      - condición de Decepción post-grupos (exige el set de 32 completo, len>=32);
-      - inyección del +1 de 16avos PROVISIONAL en vivo del scoring
-        (data_loader.cargar_todo), solo si la API aún no pobló el cuadro real.
+    ÚNICO caller: la condición de Decepción post-grupos, que exige el set de 32
+    completo (len>=32). Decepción usa STANDINGS a propósito —no el cuadro real de
+    la API— porque debe resolverse justo al cerrar grupos, cuando el bracket real
+    puede no estar publicado todavía (tiene su guard de 12 grupos completos). El +1
+    y las penalidades de 16avos, en cambio, usan el cuadro real: asimetría
+    intencional, NO unificar.
 
     Detalles:
     - Los 8 mejores terceros se incluyen SOLO si los grupos terminaron

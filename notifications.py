@@ -115,10 +115,10 @@ def obtener_leaderboard():
 
     categorias_reales = obtener_categorias_reales_simuladas()
 
-    # Mismo builder compartido que la app (data_loader.cargar_todo): aplica la
-    # inyección provisional de 16avos y pasa grupos_cerrados a las penalidades,
-    # para que el leaderboard del mail NO diverja del de la app.
-    todos_puntajes, _campeon, _tercero, _eq, _gc = construir_puntajes(
+    # Mismo builder compartido que la app (data_loader.cargar_todo): el set de
+    # 16avos sale del cuadro real de la API, para que el leaderboard del mail NO
+    # diverja del de la app.
+    todos_puntajes, _campeon, _tercero, _eq = construir_puntajes(
         resultados, apuestas_grupos, categorias_todos, total_results_todos, categorias_reales,
     )
 

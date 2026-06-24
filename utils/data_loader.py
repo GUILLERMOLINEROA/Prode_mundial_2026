@@ -6,10 +6,7 @@ import json
 from utils.excel_reader import cargar_todos_los_participantes
 from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
-from utils.special_categories import (
-    calcular_todas_las_categorias, grupos_finalizados, torneo_finalizado,
-    obtener_equipos_clasificados_16avos,
-)
+from utils.special_categories import calcular_todas_las_categorias, grupos_finalizados, torneo_finalizado
 from utils.group_config import overrides_path, fotos_dir
 
 
@@ -81,28 +78,23 @@ def foto_participante(nombre):
 def construir_puntajes(resultados, apuestas_grupos, categorias_todos,
                        total_results_todos, categorias_reales):
     """
-    Builder COMPARTIDO de puntajes. Arma `equipos_reales_por_ronda` (con la
-    inyección provisional de 16avos), calcula `grupos_cerrados` y puntúa a todos
-    los participantes con la MISMA lógica, para que la app (cargar_todo) y los
-    mails (notifications.obtener_leaderboard) NO puedan divergir.
+    Builder COMPARTIDO de puntajes. Arma `equipos_reales_por_ronda` desde el
+    cuadro real de la API y puntúa a todos los participantes con la MISMA lógica,
+    para que la app (cargar_todo) y los mails (notifications.obtener_leaderboard)
+    NO puedan divergir.
 
     `categorias_reales` se recibe ya resuelto a propósito: cada caller lo arma a
     su manera (la app con calcular_todas_las_categorias + overrides; los mails con
     su propia fuente) y eso queda fuera de este builder.
 
-    Retorna: (todos_puntajes, campeon_real, tercero_real, equipos_reales, grupos_cerrados)
+    16avos: el set ["16vos"] sale SOLO del cuadro real de la API
+    (extraer_equipos_reales_por_ronda). No se inyecta nada desde standings: el +1
+    de 16avos suma recién cuando la API publica la Round of 32 (al cerrar grupos).
+    Durante la fase de grupos la columna 16avos queda en 0 para todos.
+
+    Retorna: (todos_puntajes, campeon_real, tercero_real, equipos_reales)
     """
     equipos_reales = extraer_equipos_reales_por_ronda(resultados)
-
-    # +1 de 16avos PROVISIONAL en vivo: si la API todavía NO pobló el cuadro real
-    # de 16avos, lo rellenamos desde standings (1º/2º en fecha 3; los 32 al cerrar
-    # grupos). Si la API ya lo pobló, ese set es AUTORITATIVO y NO se pisa. Solo
-    # afecta ["16vos"]; 8vos/4tos/semis/final quedan intactos.
-    grupos_cerrados = bool(grupos_finalizados(resultados))
-    if not equipos_reales.get("16vos"):
-        prov_16 = obtener_equipos_clasificados_16avos(resultados)
-        if prov_16:
-            equipos_reales["16vos"] = prov_16
 
     campeon_real, tercero_real = determinar_campeon_y_tercero(resultados)
 
@@ -115,10 +107,9 @@ def construir_puntajes(resultados, apuestas_grupos, categorias_todos,
             resultados_reales=resultados,
             equipos_reales_por_ronda=equipos_reales,
             categorias_reales=categorias_reales,
-            campeon_real=campeon_real, tercero_real=tercero_real,
-            grupos_cerrados=grupos_cerrados))
+            campeon_real=campeon_real, tercero_real=tercero_real))
 
-    return todos_puntajes, campeon_real, tercero_real, equipos_reales, grupos_cerrados
+    return todos_puntajes, campeon_real, tercero_real, equipos_reales
 
 
 def cargar_todo():
@@ -156,7 +147,7 @@ def cargar_todo():
             categorias_reales["Goleador"] = cat_sim.get("Goleador", "")
 
     # Puntajes vía builder compartido (misma lógica de 16avos que los mails).
-    todos_puntajes, campeon_real, tercero_real, _eq_reales, _gc = construir_puntajes(
+    todos_puntajes, campeon_real, tercero_real, _eq_reales = construir_puntajes(
         resultados, apuestas_grupos, categorias_todos, total_results_todos, categorias_reales,
     )
 

@@ -272,7 +272,6 @@ def calcular_penalidades(
     categorias_pred: Dict[str, str],
     total_results_pred: Dict,
     equipos_reales_por_ronda: Dict[str, Set[str]],
-    grupos_cerrados: bool = False,
 ) -> Tuple[int, List[str]]:
     """
     Calcula penalidades según las reglas del PRODE [1]:
@@ -282,11 +281,13 @@ def calcular_penalidades(
     3. Peor equipo predicho pasa de grupos: -10
     4. Decepción predicha llega a semis: -20
 
-    ASIMETRÍA INTENCIONAL: las penalidades atadas a 16avos (1 y 3) SOLO se
-    evalúan con los grupos 100% cerrados (`grupos_cerrados`). El set de 16avos
-    puede venir PROVISIONAL desde standings en vivo (1º/2º durante la fecha 3),
-    y no queremos penalizar sobre una tabla que todavía se mueve. Las penalidades
-    2 y 4 usan 4tos/semis, que no tienen versión provisional, y no se tocan.
+    Las penalidades atadas a 16avos (1 y 3) solo se evalúan cuando el set REAL de
+    16avos NO está vacío, es decir cuando la API ya publicó el cuadro de la Round
+    of 32 (al cerrar grupos). Mientras ese cuadro esté vacío (grupos en curso, o
+    grupos cerrados pero la API aún no lo publicó), `eq_16vos_real` es falsy y
+    NINGUNA penalidad de 16avos dispara: así se evitan falsos -20/-10 cuando el
+    código vería "todos se quedaron en grupos". Las penalidades 2 y 4 usan
+    4tos/semis y no se tocan.
     """
     pen_total = 0
     razones = []
@@ -295,9 +296,9 @@ def calcular_penalidades(
     eq_4tos_real = equipos_reales_por_ronda.get("4tos", set())
     eq_semis_real = equipos_reales_por_ronda.get("semis", set())
 
-    # 1. Revelación se queda en grupos (solo con grupos cerrados; ver asimetría)
+    # 1. Revelación se queda en grupos (solo con el cuadro real de 16avos poblado)
     revelacion = categorias_pred.get("Revelación", "").strip()
-    if revelacion and eq_16vos_real and grupos_cerrados:
+    if revelacion and eq_16vos_real:
         if revelacion not in eq_16vos_real:
             pen_total += PENALIDADES["revelacion_queda_grupos"]
             razones.append(
@@ -315,9 +316,9 @@ def calcular_penalidades(
                 f"{PENALIDADES['campeon_no_llega_4tos']} pts"
             )
     
-    # 3. Peor equipo pasa de grupos (solo con grupos cerrados; ver asimetría)
+    # 3. Peor equipo pasa de grupos (solo con el cuadro real de 16avos poblado)
     peor = categorias_pred.get("Peor Equipo", "").strip()
-    if peor and eq_16vos_real and grupos_cerrados:
+    if peor and eq_16vos_real:
         if peor in eq_16vos_real:
             pen_total += PENALIDADES["peor_pasa_grupos"]
             razones.append(
@@ -352,15 +353,10 @@ def calcular_puntuacion_total(
     categorias_reales: Dict[str, str],
     campeon_real: str = "",
     tercero_real: str = "",
-    grupos_cerrados: bool = False,
 ) -> Dict:
     """
     Calcula la puntuación TOTAL de un participante.
     Máximo teórico: 577 puntos [1].
-
-    `grupos_cerrados`: True solo cuando los 12 grupos están 100% finalizados.
-    Habilita las penalidades de 16avos (revelación/peor equipo), que no deben
-    dispararse mientras el set de 16avos sea provisional (standings en vivo).
     """
     # 1. Fase de grupos
     pts_grupos, detalle_grupos = calcular_puntos_grupos(
@@ -385,7 +381,6 @@ def calcular_puntuacion_total(
     # 5. Penalidades
     pts_penalidades, razones_pen = calcular_penalidades(
         categorias_pred, total_results_pred, equipos_reales_por_ronda,
-        grupos_cerrados,
     )
     
     total = (
