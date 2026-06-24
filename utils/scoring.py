@@ -223,7 +223,7 @@ def calcular_puntos_campeon_y_tercero(
     campeon_real: str,
     tercero_real: str,
 ) -> Tuple[int, int]:
-    """Puntos por acertar campeón (30) y tercer puesto (5)."""
+    """Puntos por acertar campeón (20) y tercer puesto (5)."""
     pts_campeon = 0
     pts_tercero = 0
     
