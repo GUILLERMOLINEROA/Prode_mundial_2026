@@ -179,6 +179,14 @@ def main():
         # si es de grupos, devolvemos vacío
         return ""
 
+    def quienes_pasan_a_16avos(equipo):
+        """Participantes que en su Excel predijeron que `equipo` pasa a 16avos."""
+        codigos = [
+            nombre_ap for nombre_ap, tr in total_results_todos.items()
+            if equipo in set((tr.get("equipos_por_ronda", {}) or {}).get("16vos", set()))
+        ]
+        return ordenar_codigos(codigos)
+
     bienvenida_data = {}
     try:
         from utils.bienvenida import obtener_bienvenida
@@ -336,6 +344,10 @@ def main():
                 ronda_visible = etiqueta_ronda_visible(p)
                 es_grupo = ronda_visible.startswith("Grupo ")
 
+                # "Pasa a 16avos" en partidos de grupos: predicción pura (el partido
+                # no se jugó). Sale solo de los Excels, sin standings ni puntos.
+                pasa16_html = ""
+
                 if es_grupo:
                     if apuestas_grupos is not None and not apuestas_grupos.empty:
                         sub_match = apuestas_grupos[
@@ -368,6 +380,13 @@ def main():
                     visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
                     empate_txt = ", ".join(sorted(apostadores_empate)) if apostadores_empate else ""
                     tercero_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🤝 Empate: {empate_txt}</span>' if empate_txt else ""
+
+                    p16_local = ", ".join(quienes_pasan_a_16avos(local)) or "nadie"
+                    p16_visit = ", ".join(quienes_pasan_a_16avos(visitante)) or "nadie"
+                    pasa16_html = (
+                        f'<br><span style="color:#7ED957; font-size:0.75rem;">🎟️ {local} pasa a 16avos: {p16_local}</span>'
+                        f'<br><span style="color:#7ED957; font-size:0.75rem;">🎟️ {visitante} pasa a 16avos: {p16_visit}</span>'
+                    )
                 else:
                     ronda_pred = ronda_prediccion_para_match(p)
 
@@ -397,6 +416,7 @@ def main():
                     f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
+                    f'{pasa16_html}'
                     f'{tercero_html}'
                     f'</div>',
                     unsafe_allow_html=True
@@ -429,13 +449,6 @@ def main():
         except Exception:
             grupos_cerrados = False
             clasificados_16avos = set()
-
-        def quienes_pasan_a_16avos(equipo):
-            codigos = [
-                nombre_ap for nombre_ap, tr in total_results_todos.items()
-                if equipo in set((tr.get("equipos_por_ronda", {}) or {}).get("16vos", set()))
-            ]
-            return ordenar_codigos(codigos)
 
         cols_res = st.columns(3)
         for i, (_, p) in enumerate(ultimos.iterrows()):
