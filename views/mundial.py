@@ -384,7 +384,8 @@ def main():
                     p16_local = ", ".join(quienes_pasan_a_16avos(local)) or "nadie"
                     p16_visit = ", ".join(quienes_pasan_a_16avos(visitante)) or "nadie"
                     pasa16_html = (
-                        f'<br><span style="color:#7ED957; font-size:0.75rem;">🎟️ {local} pasa a 16avos: {p16_local}</span>'
+                        '<hr style="border:none; border-top:1px solid #3a3a5c; margin:8px 0 6px 0;">'
+                        f'<span style="color:#7ED957; font-size:0.75rem;">🎟️ {local} pasa a 16avos: {p16_local}</span>'
                         f'<br><span style="color:#7ED957; font-size:0.75rem;">🎟️ {visitante} pasa a 16avos: {p16_visit}</span>'
                     )
                 else:
@@ -416,8 +417,8 @@ def main():
                     f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
                     f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
-                    f'{pasa16_html}'
                     f'{tercero_html}'
+                    f'{pasa16_html}'
                     f'</div>',
                     unsafe_allow_html=True
                 )
