@@ -6,7 +6,10 @@ import json
 from utils.excel_reader import cargar_todos_los_participantes
 from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
-from utils.special_categories import calcular_todas_las_categorias, grupos_finalizados, torneo_finalizado
+from utils.special_categories import (
+    calcular_todas_las_categorias, grupos_finalizados, torneo_finalizado,
+    obtener_equipos_clasificados_16avos,
+)
 from utils.group_config import overrides_path, fotos_dir
 
 
@@ -75,6 +78,49 @@ def foto_participante(nombre):
     return None
 
 
+def construir_puntajes(resultados, apuestas_grupos, categorias_todos,
+                       total_results_todos, categorias_reales):
+    """
+    Builder COMPARTIDO de puntajes. Arma `equipos_reales_por_ronda` (con la
+    inyección provisional de 16avos), calcula `grupos_cerrados` y puntúa a todos
+    los participantes con la MISMA lógica, para que la app (cargar_todo) y los
+    mails (notifications.obtener_leaderboard) NO puedan divergir.
+
+    `categorias_reales` se recibe ya resuelto a propósito: cada caller lo arma a
+    su manera (la app con calcular_todas_las_categorias + overrides; los mails con
+    su propia fuente) y eso queda fuera de este builder.
+
+    Retorna: (todos_puntajes, campeon_real, tercero_real, equipos_reales, grupos_cerrados)
+    """
+    equipos_reales = extraer_equipos_reales_por_ronda(resultados)
+
+    # +1 de 16avos PROVISIONAL en vivo: si la API todavía NO pobló el cuadro real
+    # de 16avos, lo rellenamos desde standings (1º/2º en fecha 3; los 32 al cerrar
+    # grupos). Si la API ya lo pobló, ese set es AUTORITATIVO y NO se pisa. Solo
+    # afecta ["16vos"]; 8vos/4tos/semis/final quedan intactos.
+    grupos_cerrados = bool(grupos_finalizados(resultados))
+    if not equipos_reales.get("16vos"):
+        prov_16 = obtener_equipos_clasificados_16avos(resultados)
+        if prov_16:
+            equipos_reales["16vos"] = prov_16
+
+    campeon_real, tercero_real = determinar_campeon_y_tercero(resultados)
+
+    todos_puntajes = []
+    for part in categorias_todos:
+        todos_puntajes.append(calcular_puntuacion_total(
+            participante=part, apuestas_grupos=apuestas_grupos,
+            categorias_pred=categorias_todos.get(part, {}),
+            total_results_pred=total_results_todos.get(part, {}),
+            resultados_reales=resultados,
+            equipos_reales_por_ronda=equipos_reales,
+            categorias_reales=categorias_reales,
+            campeon_real=campeon_real, tercero_real=tercero_real,
+            grupos_cerrados=grupos_cerrados))
+
+    return todos_puntajes, campeon_real, tercero_real, equipos_reales, grupos_cerrados
+
+
 def cargar_todo():
     if "datos_cargados" in st.session_state and st.session_state["datos_cargados"]:
         return True
@@ -109,21 +155,10 @@ def cargar_todo():
         if not categorias_reales.get("Goleador"):
             categorias_reales["Goleador"] = cat_sim.get("Goleador", "")
 
-    equipos_reales = extraer_equipos_reales_por_ronda(resultados)
-    campeon_real, tercero_real = determinar_campeon_y_tercero(resultados)
-
-    participantes = list(categorias_todos.keys())
-    todos_puntajes = []
-    for part in participantes:
-        puntaje = calcular_puntuacion_total(
-            participante=part, apuestas_grupos=apuestas_grupos,
-            categorias_pred=categorias_todos.get(part, {}),
-            total_results_pred=total_results_todos.get(part, {}),
-            resultados_reales=resultados,
-            equipos_reales_por_ronda=equipos_reales,
-            categorias_reales=categorias_reales,
-            campeon_real=campeon_real, tercero_real=tercero_real)
-        todos_puntajes.append(puntaje)
+    # Puntajes vía builder compartido (misma lógica de 16avos que los mails).
+    todos_puntajes, campeon_real, tercero_real, _eq_reales, _gc = construir_puntajes(
+        resultados, apuestas_grupos, categorias_todos, total_results_todos, categorias_reales,
+    )
 
     leaderboard = generar_leaderboard(todos_puntajes)
 
