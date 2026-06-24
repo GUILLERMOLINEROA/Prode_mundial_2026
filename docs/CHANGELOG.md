@@ -1,6 +1,63 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-24 (más tarde) — Reversión: 16avos suma solo con el cuadro real de la API
+
+**Cambio de criterio respecto de la entrada anterior.** Se revirtió el +1 de 16avos
+**provisional desde standings** que se había introducido en `7a0e30a`. Ese mecanismo
+hacía que durante la fase de grupos la columna "16avos" mostrara ~23/24 puntos
+(1º y 2º de cada grupo), lo cual era **confuso** (parecía puntaje ganado cuando
+todavía no se jugó ninguna eliminatoria).
+
+Decisión de producto: **el +1 de 16avos suma solo cuando la API ya publicó el cuadro
+real de la Round of 32** (es decir, al cerrar grupos). Efecto aceptado: durante la
+fase de grupos la columna 16avos queda en **0 para todos**, y vuelve —ya como puntaje
+real— cuando aparece el cuadro de la API.
+
+Commits incluidos en este push:
+
+- `9e56b8b` — fix(scoring): 16avos suma solo con cuadro real de la API (sin provisional);
+  penalidades de 16avos atadas al cuadro real.
+- `d22d69a` — style(mundial): empate bajo el segundo país + separador antes de
+  "pasa a 16avos" en Próximos Partidos.
+- (este) — docs: registro de la reversión.
+
+### Qué cambió respecto del modelo provisional
+
+- **Leaderboard / scoring:** `data_loader.construir_puntajes` ya **no inyecta** el set de
+  standings en `equipos_reales_por_ronda["16vos"]`. Ese set sale **solo** del cuadro real
+  (`extraer_equipos_reales_por_ronda`). Se eliminó el flag `grupos_cerrados` (quedó sin uso)
+  de `construir_puntajes`, `calcular_penalidades` y `calcular_puntuacion_total`.
+- **Penalidades de 16avos** (revelación −20, peor equipo −10): ahora disparan solo cuando
+  el set **real** de 16avos NO está vacío (cuadro publicado), en lugar de `grupos_cerrados`.
+  Esto evita falsos −20/−10 en la ventana "grupos cerrados pero la API aún no publicó el
+  cuadro" (set vacío → el código creería que todos se quedaron en grupos).
+- **Tarjeta "pasa a 16avos" en Últimos Resultados:** pasa a leer del **cuadro real** (misma
+  fuente que el scoring), se le sacó la etiqueta "provisional" y solo aparece cuando el
+  cuadro existe. Así la tarjeta no promete un +1 que el leaderboard no está sumando.
+- **Próximos Partidos:** la predicción "pasa a 16avos" (que sale de los Excel, sin standings
+  ni puntos) se mantiene; solo cambió el layout (empate debajo del segundo país + separador).
+
+### Asimetría intencional (sigue vigente)
+
+- **Decepción** sigue resolviéndose desde **standings** (`obtener_equipos_clasificados_16avos`,
+  con su guard de 12 grupos completos), NO desde el cuadro real, porque debe cerrarse justo
+  al terminar grupos cuando el bracket real puede no estar publicado todavía.
+- El **+1 y las penalidades** de 16avos usan el **cuadro real**. No unificar las dos fuentes.
+
+### Validación
+
+- Validado con fixtures/standings mockeados: 16avos=0 durante grupos; +1 con cuadro real;
+  sin penalidades con cuadro vacío; penalidades con cuadro poblado; Decepción intacta desde
+  standings; TAREA 2 y 8vos+ intactos; smoke (server HTTP 200, `obtener_leaderboard` corre).
+- **Pendiente con datos reales 2026:** que la API publique la Round of 32 con nombres mapeados
+  al cerrar grupos, y que ahí el +1 y las penalidades disparen con datos reales.
+
+---
+
 ## 2026-06-24 — "pasa a 16avos" en vivo, Decepción post-grupos, consistencia de mails
+
+> ⚠️ El "+1 de 16avos provisional en vivo" descripto en esta entrada fue **revertido** en la
+> entrada de arriba (2026-06-24 más tarde). Se conserva el registro del criterio original.
 
 Rama: `main`. Commits incluidos en este push:
 
