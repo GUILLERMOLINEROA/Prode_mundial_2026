@@ -406,6 +406,37 @@ def main():
     ultimos = obtener_ultimos_resultados(resultados, 3)
     if not ultimos.empty:
         st.markdown("#### ⚡ Últimos Resultados")
+
+        # --- "Pasa a 16avos": clasificados (provisionales) desde standings oficiales ---
+        # DOBLE FUENTE (a propósito):
+        #   - La tarjeta DERIVA "pasa a 16avos" de los STANDINGS (1º/2º + 8 mejores
+        #     terceros), vía obtener_equipos_clasificados_16avos() — misma función
+        #     que usa la condición de Decepción. Es informativo/provisional.
+        #   - El +1 REAL que entra al leaderboard lo otorga el scoring desde los
+        #     FIXTURES de 16avos de la API (extraer_equipos_reales_por_ronda en
+        #     data_loader.py). Son fuentes DISTINTAS: pueden discrepar en una ventana
+        #     corta (grupos ya cerrados en standings, pero cuadro de 16avos todavía
+        #     sin poblar). Es tolerable porque la línea de la tarjeta es provisional.
+        #   - REQUIERE VALIDACIÓN CONTRA STANDINGS REALES DURANTE EL TORNEO 2026.
+        from utils.scoring import PUNTOS as _PUNTOS_16
+        try:
+            from utils.special_categories import (
+                grupos_finalizados as _grupos_fin,
+                obtener_equipos_clasificados_16avos as _clasificados_16avos_fn,
+            )
+            grupos_cerrados = bool(_grupos_fin(resultados))
+            clasificados_16avos = _clasificados_16avos_fn(resultados)
+        except Exception:
+            grupos_cerrados = False
+            clasificados_16avos = set()
+
+        def quienes_pasan_a_16avos(equipo):
+            codigos = [
+                nombre_ap for nombre_ap, tr in total_results_todos.items()
+                if equipo in set((tr.get("equipos_por_ronda", {}) or {}).get("16vos", set()))
+            ]
+            return ordenar_codigos(codigos)
+
         cols_res = st.columns(3)
         for i, (_, p) in enumerate(ultimos.iterrows()):
             with cols_res[i]:
@@ -480,6 +511,17 @@ def main():
                         f'<br><span style="color:#4A90D9; font-size:0.75rem;">➕ +1: {plus1_txt}</span>'
                         f'<br><span style="color:#7C8C8D; font-size:0.75rem;">❌ +0: {plus0_txt}</span>'
                     )
+
+                    # "Pasa a 16avos (+1)": solo para los equipos del partido que ya clasifican.
+                    suf_prov = "" if grupos_cerrados else ", provisional"
+                    for eq_card in (local, visitante):
+                        if eq_card in clasificados_16avos:
+                            cods = quienes_pasan_a_16avos(eq_card)
+                            cods_txt = ", ".join(cods) if cods else "nadie"
+                            detalle_html += (
+                                f'<br><span style="color:#7ED957; font-size:0.75rem;">'
+                                f'🎟️ {eq_card} pasa a 16avos (+{_PUNTOS_16["16vos"]}{suf_prov}): {cods_txt}</span>'
+                            )
                 else:
                     detalle_html = (
                         f'<br><span style="color:#7C8C8D; font-size:0.75rem;">'
