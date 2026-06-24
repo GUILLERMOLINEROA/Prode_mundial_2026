@@ -89,8 +89,8 @@ def obtener_leaderboard():
     """Calcula el leaderboard actual usando la lógica existente. Retorna si usa simulación."""
     from utils.excel_reader import cargar_todos_los_participantes
     from utils.simulacion import generar_resultados_simulados, obtener_categorias_reales_simuladas
-    from utils.scoring import calcular_puntuacion_total, generar_leaderboard
-    from utils.data_loader import extraer_equipos_reales_por_ronda, determinar_campeon_y_tercero
+    from utils.scoring import generar_leaderboard
+    from utils.data_loader import construir_puntajes
 
     apuestas_grupos, pred_elim, categorias_todos, total_results_todos = cargar_todos_los_participantes()
 
@@ -114,20 +114,13 @@ def obtener_leaderboard():
         resultados = generar_resultados_simulados("todo")
 
     categorias_reales = obtener_categorias_reales_simuladas()
-    equipos_reales = extraer_equipos_reales_por_ronda(resultados)
-    campeon_real, tercero_real = determinar_campeon_y_tercero(resultados)
 
-    todos_puntajes = []
-    for part in categorias_todos:
-        puntaje = calcular_puntuacion_total(
-            participante=part, apuestas_grupos=apuestas_grupos,
-            categorias_pred=categorias_todos.get(part, {}),
-            total_results_pred=total_results_todos.get(part, {}),
-            resultados_reales=resultados,
-            equipos_reales_por_ronda=equipos_reales,
-            categorias_reales=categorias_reales,
-            campeon_real=campeon_real, tercero_real=tercero_real)
-        todos_puntajes.append(puntaje)
+    # Mismo builder compartido que la app (data_loader.cargar_todo): aplica la
+    # inyección provisional de 16avos y pasa grupos_cerrados a las penalidades,
+    # para que el leaderboard del mail NO diverja del de la app.
+    todos_puntajes, _campeon, _tercero, _eq, _gc = construir_puntajes(
+        resultados, apuestas_grupos, categorias_todos, total_results_todos, categorias_reales,
+    )
 
     leaderboard = generar_leaderboard(todos_puntajes)
     return leaderboard, resultados, categorias_todos, usando_simulacion
