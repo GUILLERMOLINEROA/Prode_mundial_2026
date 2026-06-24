@@ -271,7 +271,38 @@ def calcular_todas_las_categorias(resultados):
         "Peor Equipo": determinar_peor_equipo(tabla_grupos, fase_maxima),
     }
 
-    # 3) Solo al terminar el torneo cerramos Revelación y Decepción
+    # 3) Decepción TAMBIÉN al terminar grupos, pero SOLO si un favorito real
+    #    (clase 1) NO está entre los 32 clasificados a 16avos (según standings).
+    #    Es una cuestión de REPRESENTATIVIDAD: que la Decepción oficial sea un
+    #    favorito realmente eliminado, no el clase-1 que clasificó peor.
+    #
+    #    OJO: NO se puede usar fase_maxima acá. Apenas terminan los grupos, los
+    #    fixtures de 16avos de la API todavía no tienen equipos reales (vienen null
+    #    hasta que se arma el cuadro), así que TODOS los equipos tendrían fase_max==0
+    #    —incluidos los que clasificaron— y la condición se dispararía siempre. Por
+    #    eso usamos el set de clasificados de standings (misma fuente que las
+    #    tarjetas de "pasa a 16avos").
+    #
+    #    Nota: NO se relaciona con la penalidad decepcion_llega_semis. Esa penalidad
+    #    evalúa la decepción PRONOSTICADA por cada participante (categorias_pred), no
+    #    esta decepción oficial. (Revelación queda intacta: solo se cierra a fin de
+    #    torneo.)
+    if not torneo_finalizado(resultados) and not equipos_clase.empty:
+        clasificados_16 = obtener_equipos_clasificados_16avos(resultados)
+        # Exigimos las 32 plazas COMPLETAS antes de decidir. grupos_finalizados()
+        # mira los FIXTURES, pero los standings vienen de OTRO endpoint y pueden
+        # llegar parciales (solo algunos de los 12 grupos). Con un set incompleto,
+        # un clase-1 que SÍ clasificó podría contar como "no clasificado" -> falsa
+        # Decepción. Si faltan plazas (o no hay standings), dejamos pendiente.
+        if len(clasificados_16) >= 32:
+            clase_1 = equipos_clase[equipos_clase["clase"] == 1]
+            hay_favorito_eliminado = any(
+                pais not in clasificados_16 for pais in clase_1["pais"]
+            )
+            if hay_favorito_eliminado:
+                categorias["Decepción"] = determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos)
+
+    # 4) Al terminar el torneo cerramos Revelación y Decepción de forma definitiva
     if torneo_finalizado(resultados):
         categorias["Revelación"] = determinar_revelacion(equipos_clase, fase_maxima) or "No hay Revelación"
         categorias["Decepción"] = determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos)
