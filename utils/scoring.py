@@ -274,20 +274,16 @@ def calcular_penalidades(
     equipos_reales_por_ronda: Dict[str, Set[str]],
 ) -> Tuple[int, List[str]]:
     """
-    Calcula penalidades según las reglas del PRODE [1]:
-
+    Calcula penalidades según las reglas del PRODE:
     1. Revelación se queda en grupos: -20
     2. Campeón predicho no llega a 4tos: -20
     3. Peor equipo predicho pasa de grupos: -10
     4. Decepción predicha llega a semis: -20
 
-    Las penalidades atadas a 16avos (1 y 3) solo se evalúan cuando el set REAL de
-    16avos NO está vacío, es decir cuando la API ya publicó el cuadro de la Round
-    of 32 (al cerrar grupos). Mientras ese cuadro esté vacío (grupos en curso, o
-    grupos cerrados pero la API aún no lo publicó), `eq_16vos_real` es falsy y
-    NINGUNA penalidad de 16avos dispara: así se evitan falsos -20/-10 cuando el
-    código vería "todos se quedaron en grupos". Las penalidades 2 y 4 usan
-    4tos/semis y no se tocan.
+    Regla de seguridad:
+    - Las penalidades ligadas a 16vos solo se evalúan cuando hay 32 equipos reales.
+    - La penalidad ligada a 4tos solo se evalúa cuando hay 8 equipos reales.
+    - La penalidad ligada a semis solo se evalúa cuando hay 4 equipos reales.
     """
     pen_total = 0
     razones = []
@@ -296,48 +292,51 @@ def calcular_penalidades(
     eq_4tos_real = equipos_reales_por_ronda.get("4tos", set())
     eq_semis_real = equipos_reales_por_ronda.get("semis", set())
 
-    # 1. Revelación se queda en grupos (solo con el cuadro real de 16avos poblado)
+    fase_16vos_completa = len(eq_16vos_real) == 32
+    fase_4tos_completa = len(eq_4tos_real) == 8
+    fase_semis_completa = len(eq_semis_real) == 4
+
+    # 1. Revelación se queda en grupos
     revelacion = categorias_pred.get("Revelación", "").strip()
-    if revelacion and eq_16vos_real:
+    if revelacion and fase_16vos_completa:
         if revelacion not in eq_16vos_real:
             pen_total += PENALIDADES["revelacion_queda_grupos"]
             razones.append(
                 f"🪦 Tu revelación ({revelacion}) se quedó en grupos: "
                 f"{PENALIDADES['revelacion_queda_grupos']} pts"
             )
-    
+
     # 2. Campeón no llega a 4tos
     campeon_pred = categorias_pred.get("Campeon", "").strip()
-    if campeon_pred and eq_4tos_real:
+    if campeon_pred and fase_4tos_completa:
         if campeon_pred not in eq_4tos_real:
             pen_total += PENALIDADES["campeon_no_llega_4tos"]
             razones.append(
                 f"💀 Tu campeón ({campeon_pred}) no llegó ni a cuartos: "
                 f"{PENALIDADES['campeon_no_llega_4tos']} pts"
             )
-    
-    # 3. Peor equipo pasa de grupos (solo con el cuadro real de 16avos poblado)
+
+    # 3. Peor equipo pasa de grupos
     peor = categorias_pred.get("Peor Equipo", "").strip()
-    if peor and eq_16vos_real:
+    if peor and fase_16vos_completa:
         if peor in eq_16vos_real:
             pen_total += PENALIDADES["peor_pasa_grupos"]
             razones.append(
                 f"😂 Tu 'peor equipo' ({peor}) pasó de grupos: "
                 f"{PENALIDADES['peor_pasa_grupos']} pts"
             )
-    
+
     # 4. Decepción llega a semis
     decepcion = categorias_pred.get("Decepción", "").strip()
-    if decepcion and eq_semis_real:
+    if decepcion and fase_semis_completa:
         if decepcion in eq_semis_real:
             pen_total += PENALIDADES["decepcion_llega_semis"]
             razones.append(
                 f"🤡 Tu decepción ({decepcion}) llegó a SEMIS: "
                 f"{PENALIDADES['decepcion_llega_semis']} pts"
             )
-    
-    return pen_total, razones
 
+    return pen_total, razones
 
 # =============================================================================
 # FUNCIÓN MAESTRA: PUNTUACIÓN TOTAL
