@@ -1,5 +1,48 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — Fix: no penalizar el centinela "No hay Revelación" (no-apuesta)
+
+**Bug en producción (afectaba el leaderboard en vivo).** Participantes que en su Excel
+eligieron la opción de **no apostar** en Revelación (literal `"No hay Revelación"`)
+recibían un **−20 falso** ("Tu revelación (No hay Revelación) se quedó en grupos"). El
+guard de `calcular_penalidades` (`if revelacion and eq_16vos_real`) solo descartaba el
+**string vacío**; el centinela de texto es truthy, no está en el cuadro de 16avos, y por
+eso disparaba la penalidad.
+
+Commit: `f388121` — fix(scoring): no penalizar a quienes eligieron "no hay revelación/
+peor equipo" (centinela de no-apuesta).
+
+### Fix
+
+- Nuevo helper `_es_no_apuesta(valor)` en `utils/scoring.py`: detecta centinelas de
+  no-apuesta de forma robusta (case-insensitive, sin acentos): valor vacío, que empiece
+  con `"no hay"` o `"sin "`, o ∈ {`ninguno`, `ninguna`, `n/a`, `na`, `-`, `--`}.
+- Se aplica el guard a las penalidades de **Revelación** (`revelacion_queda_grupos`, −20)
+  y **Peor Equipo** (`peor_pasa_grupos`, −10; defensivo: hoy no hay centinela en esa
+  categoría, pero queda cubierto a futuro). Las penalidades de campeón-4tos y
+  decepción-semis no se tocan (no tienen opción de no-apuesta).
+- Único centinela presente hoy en los Excels (4 grupos): `"No hay Revelación"` (17 casos).
+- Puntos especiales (`calcular_puntos_categorias`): ya estaba cubierto para el caso actual
+  —exige `pred and real and pred==real`, así que `"No hay Revelación"` vs real vacío no
+  suma. Verificado.
+
+### PENDIENTE — decisión de reglas (NO resuelta): el +12 del "No hay Revelación" acertado
+
+Al **cierre del torneo**, `determinar_revelacion` puede setear la revelación **real**
+también como `"No hay Revelación"` (cuando ningún equipo cumple el criterio de revelación).
+En ese caso, un participante que apostó `"No hay Revelación"` **matchearía** en
+`calcular_puntos_categorias` y sumaría **+12**. Hay que decidir:
+
+- **Opción A:** es una predicción válida; acertar que "no habría revelación" suma +12.
+- **Opción B:** el centinela es *ausencia de apuesta* → no premia ni penaliza (coherente
+  con este fix: si no penaliza, tampoco premia). Implementación: aplicar el mismo guard
+  `_es_no_apuesta` del lado del acierto en `calcular_puntos_categorias`.
+
+Estado: **indeciso**, inclinación tentativa hacia **B** por coherencia, pendiente de
+confirmación. Solo aplica al cierre del torneo → sin urgencia.
+
+---
+
 ## 2026-06-24 (más tarde) — Reversión: 16avos suma solo con el cuadro real de la API
 
 **Cambio de criterio respecto de la entrada anterior.** Se revirtió el +1 de 16avos
