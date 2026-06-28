@@ -1,5 +1,47 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — Tarjetas de eliminatoria (avance fiel al scoring, semis/final, sede sin "nan")
+
+Las tarjetas de los cruces de eliminatoria (En vivo / Próximos / Últimos) mostraban
+datos confusos heredados de fase de grupos (local/visitante duplicados, "empate" que no
+aplica, "pasa a 16avos" redundante, "nan" en la sede). Se rehicieron para que reflejen lo
+que efectivamente paga el scoring. Tarjetas de fase de grupos sin cambios. Scoring intacto.
+
+Commit: `a9db1f6` — fix(mundial): tarjetas de eliminatoria.
+
+1. **Líneas de avance fieles al scoring.** En tarjetas de eliminatoria (R32/R16/QF/SF),
+   cada equipo muestra `🔜 {equipo} pasa a {ronda siguiente} (+N)` con quienes predijeron
+   ese equipo llegando a la ronda siguiente, desde `equipos_por_ronda` (misma fuente que
+   `calcular_puntos_eliminatorias`): R32→8vos (+3), R16→4tos (+6), QF→semis (+10),
+   SF→final (+15). El overlap es **esperado y NO se deduplica**: si alguien tiene a los dos
+   equipos avanzando, cobra por los dos y aparece en ambas líneas. Se descartó la lógica
+   "por cruce" porque escondía a participantes que sí cobran (los que predijeron el cruce
+   en otra ronda).
+2. **Semifinal.** Además de "pasa a la final (+15)", muestra `🥉 quién puso a {equipo}
+   3er puesto (+5)` desde `total_results["tercero"]` (misma fuente que el scoring del 3er
+   puesto). El wording deja claro que es la predicción del participante, no un pronóstico
+   de que el equipo pierde la semi.
+3. **Final.** Muestra `🏆 quién puso a {equipo} campeón (+20)` desde
+   `total_results["campeon"]`. Subcampeón omitido (no paga: `PUNTOS` no tiene esa clave).
+4. **Limpieza visual de eliminatoria.** Se ocultó la línea de empate (no aplica en
+   mata-mata) y la sección "pasa a 16avos" (info de grupos). Tarjetas de grupos sin cambios.
+5. **Sede sin "nan".** Helper `formato_sede` muestra solo el estadio cuando la ciudad falta
+   (cubre `"nan"` / `NaN` de pandas / `None` / vacío), en grupos y eliminatoria.
+6. **Limpieza de código.** Eliminada la función muerta `ronda_prediccion_para_match`
+   (quedó sin caller tras este cambio).
+
+### Pendiente menor (anotado, sin urgencia)
+
+- La tarjeta del **partido por el 3er puesto** en sí cae al mensaje genérico (sin líneas de
+  avance). El dato del 3er puesto ya se expone en la tarjeta de **semifinal**. Cosmético.
+
+### Sin validar
+
+- El render con **cruces reales de la API** (Round of 32+ con nombres mapeados) se confirma
+  recién cuando se jueguen. Validado con mocks de ronda + predicciones reales de los Excels.
+
+---
+
 ## Pendientes abiertos (al 2026-06-28)
 
 Lista consolidada de temas conocidos sin resolver, para no perderlos de vista.
