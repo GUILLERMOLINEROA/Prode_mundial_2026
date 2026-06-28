@@ -4,7 +4,7 @@ import os
 import json
 
 from utils.excel_reader import cargar_todos_los_participantes
-from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados
+from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados, ESTADOS_FINALIZADO
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
 from utils.special_categories import calcular_todas_las_categorias, grupos_finalizados, torneo_finalizado
 from utils.group_config import overrides_path, fotos_dir
@@ -16,6 +16,33 @@ def cargar_overrides():
         with open(path) as f:
             return json.load(f)
     return {}
+
+
+def _ganador_eliminatoria(p):
+    """
+    Ganador de un cruce de eliminatoria TERMINADO, o None si no se puede
+    determinar (dato faltante -> degradación segura, no se inventa).
+    El marcador (goles_local/visitante) ya incluye el alargue; si está empatado,
+    define la tanda de penales (penales_local/visitante). Misma lógica que
+    determinar_campeon_y_tercero.
+    """
+    gl, gv = p.get("goles_local"), p.get("goles_visitante")
+    if pd.isna(gl) or pd.isna(gv):
+        return None
+    gl, gv = int(gl), int(gv)
+    if gl > gv:
+        return p.get("equipo_local", "")
+    if gv > gl:
+        return p.get("equipo_visitante", "")
+    # Empate en el marcador -> lo define la tanda de penales (estado PEN).
+    pl, pv = p.get("penales_local"), p.get("penales_visitante")
+    if pd.notna(pl) and pd.notna(pv):
+        pl, pv = int(pl), int(pv)
+        if pl > pv:
+            return p.get("equipo_local", "")
+        if pv > pl:
+            return p.get("equipo_visitante", "")
+    return None
 
 
 def extraer_equipos_reales_por_ronda(resultados):
@@ -36,6 +63,24 @@ def extraer_equipos_reales_por_ronda(resultados):
         if mx >= 3: equipos["4tos"].add(eq)
         if mx >= 4: equipos["semis"].add(eq)
         if mx >= 5: equipos["final"].add(eq)
+
+    # ELIMINATORIA: el que gana pasa, no hay reglas de clasificación. Apenas un
+    # cruce termina (FT/AET/PEN), el ganador suma la ronda SIGUIENTE sin esperar a
+    # que la API publique ese fixture (que tarda). Se agrega al MISMO set que lee el
+    # scoring -> una sola fuente, un solo camino de puntaje. Anti-doble-conteo: es un
+    # set, así que cuando la API publique el cruce real el union no duplica y el +N
+    # se otorga una sola vez por equipo. Solo eliminatoria (en grupos ganar no
+    # implica pasar) y solo partidos terminados (nada provisional en vivo).
+    siguiente_ronda = {"16vos": "8vos", "8vos": "4tos", "4tos": "semis", "semis": "final"}
+    for _, p in resultados.iterrows():
+        if str(p.get("estado", "") or "").strip() not in ESTADOS_FINALIZADO:
+            continue
+        sig = siguiente_ronda.get(clasificar_ronda(str(p.get("ronda", ""))))
+        if not sig:
+            continue  # grupos / final / 3er puesto: no propagan acá
+        ganador = _ganador_eliminatoria(p)
+        if ganador:
+            equipos[sig].add(mapear_nombre_equipo(ganador))
     return equipos
 
 

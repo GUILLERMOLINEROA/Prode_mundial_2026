@@ -1,5 +1,45 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — En eliminatoria, el ganador suma la ronda siguiente sin esperar el cuadro de la API
+
+En mata-mata el que gana pasa (no hay reglas de clasificación como en grupos), pero el +N
+de la ronda siguiente dependía de que la API publicara el fixture de esa ronda, y eso tarda
+(p.ej. Canadá ganó su 16avos pero todavía no sumaba el pase a 8vos). Ahora suma apenas
+termina el partido.
+
+1. **Qué hace.** En eliminatorias (16avos en adelante), apenas un partido está terminado
+   (FT/AET/PEN), el ganador se agrega al set de la **ronda siguiente** en
+   `equipos_reales_por_ronda` (`extraer_equipos_reales_por_ronda`), así suma el +N sin
+   esperar a que la API publique el cuadro de esa ronda. Mapeo: 16avos→8vos, 8vos→4tos,
+   4tos→semis, semis→final. (La final define campeón, que se puntúa por otra vía.)
+2. **Ganador correcto.** FT/AET por marcador (ya incluye el alargue); **PEN por la tanda**
+   (`penales_local/visitante`), no por el marcador empatado. Si un partido terminado no
+   permite determinar ganador (dato faltante) → no se agrega a nadie (degradación segura).
+3. **Anti-doble-conteo (estructural).** Se agrega al ganador al **mismo `set`** que ya lee el
+   scoring; `calcular_puntos_eliminatorias` hace `pred & real`, así que el ganador agregado
+   temprano + el fixture que la API publique después colapsan en el mismo elemento → el +N se
+   otorga **una sola vez por equipo**. Una sola fuente, un solo camino de puntaje. El ganador
+   se agrega con el nombre mapeado (`mapear_nombre_equipo`), mismo namespace que el resto del
+   set y los Excels.
+4. **Solo eliminatoria.** La fase de grupos no se toca (ahí ganar no implica pasar). Se gatea
+   por ronda y solo con partidos terminados (nada provisional en vivo).
+5. **Inconsistencia benigna documentada.** Un equipo puede estar en `["8vos"]`+ (para scoring)
+   mientras su `fase_max` sigue en el valor de la ronda actual hasta que la API publique el
+   cuadro, porque `calcular_fase_maxima_por_equipo` lee de **fixtures**, no de este set. Hoy no
+   afecta nada (la Decepción usa `fase_max`, no el set, y sigue resolviendo 'Uruguay'), pero
+   queda anotado: si en el futuro alguien deriva algo nuevo de `fase_max`, tener en cuenta este
+   desfase.
+
+### Sin validar (asterisco)
+
+- **AET y PEN con datos reales todavía no ocurrieron** (validados con mocks). La lógica de
+  penales es la más delicada: se confirma de verdad cuando se juegue el primer cruce real
+  definido por penales (que avance el de la tanda, no el del marcador empatado). Las rondas
+  profundas (8vos→4tos→…) ídem, se confirman a medida que se jueguen. Hoy solo hay 1 partido
+  de eliminatoria terminado (Canadá, FT) y propaga bien a 8vos.
+
+---
+
 ## 2026-06-28 — Fix: Decepción se resuelve desde el cuadro real de 16avos (no standings)
 
 **Bug en producción:** con grupos cerrados y 16avos en curso, la Decepción oficial no se
