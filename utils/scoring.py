@@ -25,6 +25,7 @@
 # =============================================================================
 
 import pandas as pd
+import unicodedata
 from typing import Dict, List, Tuple, Optional, Set
 
 from utils.excel_reader import obtener_equipos_predichos_por_ronda
@@ -268,6 +269,24 @@ def calcular_puntos_categorias(
 # PENALIDADES
 # =============================================================================
 
+def _es_no_apuesta(valor: str) -> bool:
+    """
+    True si `valor` es un centinela de "no aposté" en una categoría especial
+    (no un equipo real). Robusto: case-insensitive y sin acentos.
+
+    Cubre los literales que aparecen en los Excels (p.ej. "No hay Revelación")
+    y variantes razonables de no-apuesta. Se usa para NO penalizar a quien
+    eligió explícitamente no apostar en Revelación / Peor Equipo.
+    """
+    v = str(valor or "").strip().lower()
+    v = "".join(c for c in unicodedata.normalize("NFKD", v) if not unicodedata.combining(c))
+    if not v:
+        return True
+    if v.startswith("no hay") or v.startswith("sin "):
+        return True
+    return v in {"ninguno", "ninguna", "n/a", "na", "-", "--"}
+
+
 def calcular_penalidades(
     categorias_pred: Dict[str, str],
     total_results_pred: Dict,
@@ -296,9 +315,10 @@ def calcular_penalidades(
     fase_4tos_completa = len(eq_4tos_real) == 8
     fase_semis_completa = len(eq_semis_real) == 4
 
-    # 1. Revelación se queda en grupos
+    # 1. Revelación se queda en grupos (solo con la ronda de 16avos completa).
+    #    Se saltea si el participante eligió no apostar (p.ej. "No hay Revelación").
     revelacion = categorias_pred.get("Revelación", "").strip()
-    if revelacion and fase_16vos_completa:
+    if revelacion and not _es_no_apuesta(revelacion) and fase_16vos_completa:
         if revelacion not in eq_16vos_real:
             pen_total += PENALIDADES["revelacion_queda_grupos"]
             razones.append(
@@ -316,9 +336,10 @@ def calcular_penalidades(
                 f"{PENALIDADES['campeon_no_llega_4tos']} pts"
             )
 
-    # 3. Peor equipo pasa de grupos
+    # 3. Peor equipo pasa de grupos (solo con la ronda de 16avos completa).
+    #    Se saltea si el participante eligió no apostar (centinela de no-apuesta).
     peor = categorias_pred.get("Peor Equipo", "").strip()
-    if peor and fase_16vos_completa:
+    if peor and not _es_no_apuesta(peor) and fase_16vos_completa:
         if peor in eq_16vos_real:
             pen_total += PENALIDADES["peor_pasa_grupos"]
             razones.append(
