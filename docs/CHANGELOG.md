@@ -1,5 +1,40 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## Pendientes abiertos (al 2026-06-28)
+
+Lista consolidada de temas conocidos sin resolver, para no perderlos de vista.
+
+1. **Decisión del +12 (centinela "No hay Revelación").** Al cierre del torneo, si la
+   revelación **real** también resuelve como `"No hay Revelación"` (cuando ningún equipo
+   cumple el criterio), un participante que apostó `"No hay Revelación"` matchearía en
+   `calcular_puntos_categorias` y sumaría **+12**. Indeciso:
+   - **Opción A:** cuenta como predicción válida (acertó que no habría revelación).
+   - **Opción B:** el centinela es ausencia de apuesta → no premia ni penaliza (coherente
+     con el fix de penalidades de hoy). Implementación: aplicar `_es_no_apuesta` también del
+     lado del acierto en `calcular_puntos_categorias`.
+   - Inclinación tentativa hacia B por coherencia. Sin urgencia (solo aplica al cierre).
+
+2. **`== 32` exacto en `calcular_penalidades`** (introducido por el commit `a539430`, NO por
+   esta sesión). La condición `len(eq_16vos_real) == 32` **traba TODAS las penalidades de
+   16avos** si el set queda en **31** (un nombre sin mapear o un slot nulo) o en **33** (una
+   variante de nombre duplicada tipo `"Türkiye"` + `"Turquia"`). Es la misma familia de bugs
+   de mapeo de nombres que arrastra el proyecto. Mitigación: cambiar `==` por `>=` cubre el
+   caso 33 sin costo; el caso 31 requiere revisar el mapeo. No urgente, pero es un landmine
+   silencioso justo en eliminatorias.
+
+3. **`pages_hidden/1_Leaderboard.py`.** Página inactiva (carpeta no auto-cargada por
+   Streamlit) que llama a `calcular_puntuacion_total` con el scoring viejo. Landmine si se
+   activa. Decidir: borrar (si quedó obsoleta) o migrar al builder compartido.
+
+4. **Categorías especiales de los mails desde simulación.** `obtener_leaderboard()` usa
+   `obtener_categorias_reales_simuladas()` de forma **incondicional**, incluso con datos
+   reales → Mejor 1era Fase / Peor Equipo / Decepción / Figura / Goleador en los correos
+   salen de un torneo **simulado**. **Prioridad alta** en cuanto la fase de grupos produzca
+   categorías reales. Fix propuesto: builder compartido de `categorias_reales` (con overrides)
+   usado en app y mails.
+
+---
+
 ## 2026-06-28 — Fix: no penalizar el centinela "No hay Revelación" (no-apuesta)
 
 **Bug en producción (afectaba el leaderboard en vivo).** Participantes que en su Excel
