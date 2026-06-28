@@ -157,35 +157,84 @@ def main():
 
         return ronda_raw
 
-    def ronda_prediccion_para_match(row):
-        """
-        Devuelve la ronda interna usada en equipos_por_ronda.
-        """
-        rr = str(row.get("ronda", "") or "").lower()
-
-        if "32" in rr:
-            return "16vos"
-        if "16" in rr:
-            return "8vos"
-        if "quarter" in rr:
-            return "4tos"
-        if "semi" in rr:
-            return "semis"
-        if "3rd" in rr or "third" in rr:
-            return "semis"
-        if "final" in rr:
-            return "final"
-
-        # si es de grupos, devolvemos vacío
-        return ""
+    def quienes_avanzan_a(equipo, ronda):
+        """Participantes cuyo Total Results tiene a `equipo` llegando a `ronda`.
+        Misma fuente (equipos_por_ronda) que usa el scoring de eliminatorias."""
+        codigos = [
+            nombre_ap for nombre_ap, tr in total_results_todos.items()
+            if equipo in set((tr.get("equipos_por_ronda", {}) or {}).get(ronda, set()))
+        ]
+        return ordenar_codigos(codigos)
 
     def quienes_pasan_a_16avos(equipo):
         """Participantes que en su Excel predijeron que `equipo` pasa a 16avos."""
+        return quienes_avanzan_a(equipo, "16vos")
+
+    def quienes_pusieron(equipo, campo):
+        """Participantes cuyo total_results[campo] == equipo (campo: 'campeon'/'tercero').
+        Misma fuente y comparación (case-insensitive) que calcular_puntos_campeon_y_tercero."""
+        e = str(equipo or "").strip().lower()
         codigos = [
             nombre_ap for nombre_ap, tr in total_results_todos.items()
-            if equipo in set((tr.get("equipos_por_ronda", {}) or {}).get("16vos", set()))
+            if str(tr.get(campo, "") or "").strip().lower() == e
         ]
         return ordenar_codigos(codigos)
+
+    from utils.scoring import PUNTOS as _PUNTOS
+
+    # Ronda del cruce -> ronda a la que AVANZA el ganador (R -> R+1). Final y 3er
+    # puesto no tienen ronda siguiente en equipos_por_ronda (no se muestra "avanza").
+    _NOMBRE_RONDA = {"8vos": "8vos", "4tos": "4tos", "semis": "semis", "final": "la final"}
+
+    def avance_ronda_siguiente(row):
+        """Para un cruce de eliminatoria: (ronda_siguiente, puntos) o (None, 0)."""
+        rr = str(row.get("ronda", "") or "").lower()
+        if "3rd" in rr or "third" in rr:
+            return None, 0                       # 3er puesto: no avanza a nada
+        if "32" in rr:      return "8vos", _PUNTOS["8vos"]    # Round of 32 -> octavos
+        if "16" in rr:      return "4tos", _PUNTOS["4tos"]    # Round of 16 -> cuartos
+        if "quarter" in rr: return "semis", _PUNTOS["semis"]
+        if "semi" in rr:    return "final", _PUNTOS["final"]
+        return None, 0                           # final / grupos / desconocido
+
+    def formato_sede(estadio, ciudad):
+        """Sede legible; oculta ciudad/estadio ausentes o 'nan'/'none' (sin coma colgada)."""
+        e = str(estadio or "").strip()
+        c = str(ciudad or "").strip()
+        if e.lower() in ("nan", "none"):
+            e = ""
+        if c.lower() in ("nan", "none"):
+            c = ""
+        if e and c:
+            return f"{e}, {c}"
+        return e or c or "Sede por confirmar"
+
+    def lineas_avance_eliminatoria(row, local, visitante):
+        """
+        Textos de las líneas de una tarjeta de eliminatoria, según la ronda:
+          - R32/R16/QF/SF: "{equipo} pasa a {R+1} (+N)" desde equipos_por_ronda.
+          - Semifinal: además "quién puso a {equipo} 3er puesto (+5)" desde
+            total_results["tercero"].
+          - Final: "quién puso a {equipo} campeón (+20)" desde total_results["campeon"].
+        Todas las fuentes son las mismas que usa el scoring. Devuelve [] si no aplica.
+        """
+        rr = str(row.get("ronda", "") or "").lower()
+        lineas = []
+        ronda_sig, pts_sig = avance_ronda_siguiente(row)
+        if ronda_sig:
+            nom = _NOMBRE_RONDA.get(ronda_sig, ronda_sig)
+            for eq in (local, visitante):
+                cods = ", ".join(quienes_avanzan_a(eq, ronda_sig)) or "nadie"
+                lineas.append(f'🔜 <b>{eq}</b> pasa a {nom} (+{pts_sig}): {cods}')
+        if ronda_sig == "final":  # es semifinal -> también define el 3er puesto
+            for eq in (local, visitante):
+                cods = ", ".join(quienes_pusieron(eq, "tercero")) or "nadie"
+                lineas.append(f'🥉 quién puso a <b>{eq}</b> 3er puesto (+{_PUNTOS["3ero"]}): {cods}')
+        elif "final" in rr and "3rd" not in rr and "third" not in rr:  # la final
+            for eq in (local, visitante):
+                cods = ", ".join(quienes_pusieron(eq, "campeon")) or "nadie"
+                lineas.append(f'🏆 quién puso a <b>{eq}</b> campeón (+{_PUNTOS["campeon"]}): {cods}')
+        return lineas
 
     bienvenida_data = {}
     try:
@@ -236,58 +285,64 @@ def main():
                 elif minuto and pd.notna(minuto):
                     estado_txt = f"{estado} · {int(minuto)}'"
 
-                estadio = str(p.get("estadio", "") or "").strip()
-                ciudad = str(p.get("ciudad", "") or "").strip()
-
-                if estadio and ciudad:
-                    lugar = f"{estadio}, {ciudad}"
-                elif estadio:
-                    lugar = estadio
-                elif ciudad:
-                    lugar = ciudad
-                else:
-                    lugar = "Sede por confirmar"
+                lugar = formato_sede(p.get("estadio"), p.get("ciudad"))
 
                 horarios_txt = formatear_horarios_partido(p.get("fecha"))
 
-                apostadores_local = []
-                apostadores_visitante = []
-                apostadores_empate = []
+                es_grupo = etiqueta_ronda_visible(p).startswith("Grupo ")
 
-                if apuestas_grupos is not None and not apuestas_grupos.empty:
-                    sub_match = apuestas_grupos[
-                        (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
-                        (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
-                    ].copy()
+                if es_grupo:
+                    apostadores_local = []
+                    apostadores_visitante = []
+                    apostadores_empate = []
 
-                    for _, ap in sub_match.iterrows():
-                        nombre_ap = str(ap.get("participante", "")).strip()
-                        glp = ap.get("goles_local_pred")
-                        gvp = ap.get("goles_visitante_pred")
+                    if apuestas_grupos is not None and not apuestas_grupos.empty:
+                        sub_match = apuestas_grupos[
+                            (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
+                            (apuestas_grupos["equipo_visitante"].astype(str).str.strip() == visitante)
+                        ].copy()
 
-                        if pd.isna(glp) or pd.isna(gvp):
-                            continue
+                        for _, ap in sub_match.iterrows():
+                            nombre_ap = str(ap.get("participante", "")).strip()
+                            glp = ap.get("goles_local_pred")
+                            gvp = ap.get("goles_visitante_pred")
 
-                        try:
-                            glp = int(glp)
-                            gvp = int(gvp)
-                        except Exception:
-                            continue
+                            if pd.isna(glp) or pd.isna(gvp):
+                                continue
 
-                        if glp > gvp:
-                            apostadores_local.append(nombre_ap)
-                        elif gvp > glp:
-                            apostadores_visitante.append(nombre_ap)
-                        else:
-                            apostadores_empate.append(nombre_ap)
+                            try:
+                                glp = int(glp)
+                                gvp = int(gvp)
+                            except Exception:
+                                continue
 
-                local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
-                visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
-                empate_txt = ", ".join(sorted(apostadores_empate)) if apostadores_empate else ""
+                            if glp > gvp:
+                                apostadores_local.append(nombre_ap)
+                            elif gvp > glp:
+                                apostadores_visitante.append(nombre_ap)
+                            else:
+                                apostadores_empate.append(nombre_ap)
 
-                empate_html = ""
-                if empate_txt:
-                    empate_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🤝 Empate: {empate_txt}</span>'
+                    local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
+                    visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
+                    empate_txt = ", ".join(sorted(apostadores_empate)) if apostadores_empate else ""
+
+                    empate_html = ""
+                    if empate_txt:
+                        empate_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🤝 Empate: {empate_txt}</span>'
+
+                    apostadores_html = (
+                        f'<span style="color:#AEC6CF; font-size:0.78rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
+                        f'<span style="color:#AEC6CF; font-size:0.78rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
+                        f'{empate_html}'
+                    )
+                else:
+                    # Eliminatoria: líneas de avance / 3er puesto (semis) / campeón
+                    # (final). Fuentes = las del scoring. Sin empate.
+                    apostadores_html = "<br>".join(
+                        f'<span style="color:#7ED957; font-size:0.78rem;">{ln}</span>'
+                        for ln in lineas_avance_eliminatoria(p, local, visitante)
+                    )
 
                 st.markdown(
                     f'<div style="background:#2a1a1a; border:1px solid #E74C3C; border-radius:8px; '
@@ -302,9 +357,7 @@ def main():
                     f'<span style="color:#AEC6CF; font-size:0.88rem;">🕒 {horarios_txt}</span><br>'
                     f'<span style="color:#7C8C8D; font-size:0.82rem;">📍 {lugar}</span><br>'
                     f'<div style="margin-top:10px;">'
-                    f'<span style="color:#AEC6CF; font-size:0.78rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
-                    f'<span style="color:#AEC6CF; font-size:0.78rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
-                    f'{empate_html}'
+                    f'{apostadores_html}'
                     f'</div>'
                     f'</div>',
                     unsafe_allow_html=True
@@ -320,35 +373,19 @@ def main():
             with cols_prox[i]:
                 horarios_txt = formatear_horarios_partido(p.get("fecha"))
 
-
-                estadio = str(p.get("estadio", "") or "").strip()
-                ciudad = str(p.get("ciudad", "") or "").strip()
-
-                if estadio and ciudad:
-                    lugar = f"{estadio}, {ciudad}"
-                elif estadio:
-                    lugar = estadio
-                elif ciudad:
-                    lugar = ciudad
-                else:
-                    lugar = "Sede por confirmar"
+                lugar = formato_sede(p.get("estadio"), p.get("ciudad"))
 
                 local = str(p["equipo_local"]).strip()
                 visitante = str(p["equipo_visitante"]).strip()
 
-                apostadores_local = []
-                apostadores_visitante = []
-                apostadores_empate = []
-                apostadores_ninguno = []
-
                 ronda_visible = etiqueta_ronda_visible(p)
                 es_grupo = ronda_visible.startswith("Grupo ")
 
-                # "Pasa a 16avos" en partidos de grupos: predicción pura (el partido
-                # no se jugó). Sale solo de los Excels, sin standings ni puntos.
-                pasa16_html = ""
-
                 if es_grupo:
+                    apostadores_local = []
+                    apostadores_visitante = []
+                    apostadores_empate = []
+
                     if apuestas_grupos is not None and not apuestas_grupos.empty:
                         sub_match = apuestas_grupos[
                             (apuestas_grupos["equipo_local"].astype(str).str.strip() == local) &
@@ -388,25 +425,21 @@ def main():
                         f'<span style="color:#7ED957; font-size:0.75rem;">🎟️ {local} pasa a 16avos: {p16_local}</span>'
                         f'<br><span style="color:#7ED957; font-size:0.75rem;">🎟️ {visitante} pasa a 16avos: {p16_visit}</span>'
                     )
+
+                    apostadores_html = (
+                        f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
+                        f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
+                        f'{tercero_html}'
+                        f'{pasa16_html}'
+                    )
                 else:
-                    ronda_pred = ronda_prediccion_para_match(p)
-
-                    for nombre_ap, tr in total_results_todos.items():
-                        equipos_pred = set((tr.get("equipos_por_ronda", {}) or {}).get(ronda_pred, set()))
-                        tiene_local = local in equipos_pred
-                        tiene_visitante = visitante in equipos_pred
-
-                        if tiene_local:
-                            apostadores_local.append(nombre_ap)
-                        if tiene_visitante:
-                            apostadores_visitante.append(nombre_ap)
-                        if not tiene_local and not tiene_visitante:
-                            apostadores_ninguno.append(nombre_ap)
-
-                    local_txt = ", ".join(sorted(apostadores_local)) if apostadores_local else "nadie"
-                    visitante_txt = ", ".join(sorted(apostadores_visitante)) if apostadores_visitante else "nadie"
-                    ninguno_txt = ", ".join(sorted(apostadores_ninguno)) if apostadores_ninguno else "nadie"
-                    tercero_html = f'<br><span style="color:#7C8C8D; font-size:0.72rem;">🚫 Ninguno: {ninguno_txt}</span>'
+                    # Eliminatoria: líneas de avance / 3er puesto (semis) / campeón
+                    # (final). Fuentes = las del scoring. Sin "empate"/"ninguno" ni
+                    # "pasa a 16avos". El overlap entre equipos es esperado y correcto.
+                    apostadores_html = "<br>".join(
+                        f'<span style="color:#7ED957; font-size:0.75rem;">{ln}</span>'
+                        for ln in lineas_avance_eliminatoria(p, local, visitante)
+                    )
 
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #4A90D9; border-radius:8px; '
@@ -415,10 +448,7 @@ def main():
                     f'<b>{local}</b> vs <b>{visitante}</b><br>'
                     f'<span style="color:#AEC6CF; font-size:0.9rem;">🕒 {horarios_txt}</span><br>'
                     f'<span style="color:#7C8C8D; font-size:0.8rem;">📍 {lugar}</span><br>'
-                    f'<span style="color:#AEC6CF; font-size:0.75rem;">🏠 <b>{local}</b>: {local_txt}</span><br>'
-                    f'<span style="color:#AEC6CF; font-size:0.75rem;">✈️ <b>{visitante}</b>: {visitante_txt}</span>'
-                    f'{tercero_html}'
-                    f'{pasa16_html}'
+                    f'{apostadores_html}'
                     f'</div>',
                     unsafe_allow_html=True
                 )
@@ -526,11 +556,20 @@ def main():
                                 f'🎟️ {eq_card} pasa a 16avos (+{_PUNTOS_16["16vos"]}): {cods_txt}</span>'
                             )
                 else:
-                    detalle_html = (
-                        f'<br><span style="color:#7C8C8D; font-size:0.75rem;">'
-                        f'🏟️ En eliminatorias el puntaje no depende del marcador, sino de quién hizo pasar a los equipos.'
-                        f'</span>'
-                    )
+                    # Eliminatoria: líneas de avance / 3er puesto (semis) / campeón
+                    # (final). Fuentes = las del scoring; el overlap es esperado.
+                    _lineas = lineas_avance_eliminatoria(p, local, visitante)
+                    if _lineas:
+                        detalle_html = "".join(
+                            f'<br><span style="color:#7ED957; font-size:0.75rem;">{ln}</span>'
+                            for ln in _lineas
+                        )
+                    else:
+                        detalle_html = (
+                            f'<br><span style="color:#7C8C8D; font-size:0.75rem;">'
+                            f'🏟️ En eliminatorias el puntaje no depende del marcador, sino de quién hizo pasar a los equipos.'
+                            f'</span>'
+                        )
 
                 st.markdown(
                     f'<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; '
