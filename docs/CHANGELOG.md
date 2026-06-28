@@ -1,5 +1,32 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — Fix: Decepción se resuelve desde el cuadro real de 16avos (no standings)
+
+**Bug en producción:** con grupos cerrados y 16avos en curso, la Decepción oficial no se
+resolvía (nadie cobraba los +12). Uruguay (clase 1) quedó eliminado en grupos y debía ser la
+Decepción, pero `categorias_reales["Decepción"]` quedaba `""`.
+
+**Causa raíz (confirmada con datos reales):** la condición usaba
+`obtener_equipos_clasificados_16avos` (standings) con candado `len(...) >= 32`. El endpoint
+`/standings` devuelve **13 "grupos"** (el ranking de terceros se cuela como un grupo más y el
+filtro de `obtener_clasificados_por_grupo` no lo detecta → `ranking_terceros` queda vacío),
+con lo que el set se arma mal y da **31** → el candado `>= 32` nunca se cumple → Decepción
+nunca se resolvía. Es el mismo landmine de mapeo/`==N` ya anotado en pendientes.
+
+**Fix:** `calcular_todas_las_categorias` resuelve la Decepción post-grupos desde el **cuadro
+real de 16avos** (equipos con `fase_max >= 1`, misma fuente que el scoring de eliminatorias),
+no desde standings. Un clase-1 está "eliminado" si NO está en ese cuadro. Se evita el conteo
+exacto: solo se exige que el bracket esté **materialmente poblado** (`>= 24`, umbral
+defensivo, no `== 32`) para no disparar falsos positivos en la ventana "grupos recién cerrados,
+fixtures de 16avos aún sin equipos" (ahí queda pendiente y se resuelve solo al poblarse).
+Bordes preservados: grupos sin cerrar → todo vacío; ventana con bracket vacío → sin falso
+positivo; cierre de torneo → Revelación/Decepción se cierran igual que antes. `determinar_decepcion`
+intacto. Se eliminó la función `obtener_equipos_clasificados_16avos` (quedó sin caller).
+
+Validado con datos reales: `Decepción = 'Uruguay'`, y quien la apostó (7 participantes) cobra +12.
+
+---
+
 ## 2026-06-28 — Tarjetas de eliminatoria (avance fiel al scoring, semis/final, sede sin "nan")
 
 Las tarjetas de los cruces de eliminatoria (En vivo / Próximos / Últimos) mostraban
@@ -63,6 +90,16 @@ Lista consolidada de temas conocidos sin resolver, para no perderlos de vista.
    de mapeo de nombres que arrastra el proyecto. Mitigación: cambiar `==` por `>=` cubre el
    caso 33 sin costo; el caso 31 requiere revisar el mapeo. No urgente, pero es un landmine
    silencioso justo en eliminatorias.
+   - **CAUSA RAÍZ CONFIRMADA (2026-06-28, datos reales):** el endpoint `/standings` devuelve
+     **13 "grupos"** durante los 16avos — el *ranking de terceros* entra como un grupo más y
+     el filtro de `obtener_clasificados_por_grupo` (`"third-placed"`/`"ranking of third"`) NO
+     lo detecta con el nombre real que manda la API → `ranking_terceros` queda vacío y el
+     conteo de clasificados da **31** en lugar de 32. Esto fue lo que trababa la Decepción
+     (ya resuelto migrándola al cuadro real). **Las penalidades de 16avos en
+     `calcular_penalidades` siguen usando `eq_16vos_real` que viene del cuadro real de
+     fixtures, NO de standings**, así que probablemente NO sufran este bug puntual — pero el
+     `== 32` exacto sigue siendo frágil ante el caso 31/33 de mapeo. Al encararlas: cambiar a
+     `>= 32` y/o revisar el filtro del pseudo-grupo de terceros en `obtener_clasificados_por_grupo`.
 
 3. **`pages_hidden/1_Leaderboard.py`.** Página inactiva (carpeta no auto-cargada por
    Streamlit) que llama a `calcular_puntuacion_total` con el scoring viejo. Landmine si se

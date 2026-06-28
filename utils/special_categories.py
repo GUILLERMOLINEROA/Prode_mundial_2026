@@ -50,86 +50,6 @@ def torneo_finalizado(resultados):
     return finales["estado"].isin(ESTADOS_FINALIZADO).any()
 
 
-def obtener_equipos_clasificados_16avos(resultados=None):
-    """
-    Set de equipos clasificados a 16avos según los STANDINGS oficiales:
-    12 primeros + 12 segundos + 8 mejores terceros.
-
-    Modos según `resultados` (vía grupos_finalizados):
-      - PROVISIONAL (grupos en curso): solo 1º y 2º de cada grupo. SIN terceros
-        (el corte de los 8 mejores no tiene sentido hasta cerrar los 12 grupos).
-      - DEFINITIVO (grupos cerrados): los 32 (1º + 2º + 8 mejores terceros).
-
-    ÚNICO caller: la condición de Decepción post-grupos, que exige el set de 32
-    completo (len>=32). Decepción usa STANDINGS a propósito —no el cuadro real de
-    la API— porque debe resolverse justo al cerrar grupos, cuando el bracket real
-    puede no estar publicado todavía (tiene su guard de 12 grupos completos). El +1
-    y las penalidades de 16avos, en cambio, usan el cuadro real: asimetría
-    intencional, NO unificar.
-
-    Detalles:
-    - Los 8 mejores terceros se incluyen SOLO si los grupos terminaron
-      (`grupos_finalizados`); antes, el corte de los mejores terceros no tiene
-      sentido. Si `resultados` es None, se asume que NO terminaron.
-    - Si la API ya emite el ranking oficial de terceros, se usa ese (tiebreak
-      FIFA). Si no, fallback: 3º de cada grupo ordenado por pts -> DG -> GF.
-    - Nombres MAPEADOS (mapear_nombre_equipo) al mismo namespace que el Excel /
-      equipos_por_ronda["16vos"], para que el matcheo no tenga huecos silenciosos
-      (p.ej. Türkiye->Turquia). `primeros/segundos/ranking_terceros` ya vienen
-      mapeados de obtener_clasificados_por_grupo; el fallback mapea explícitamente
-      porque standings_completos trae nombres crudos.
-    - Sin API key / sin standings -> set() (degradación segura).
-    - Garantía dura: con grupos cerrados el set nunca supera 32 (12+12+8).
-    - Defensivo: si un grupo trae menos de 3 equipos, no asume el índice 2.
-
-    REQUIERE VALIDACIÓN CONTRA STANDINGS REALES DURANTE EL TORNEO 2026.
-    """
-    from utils.api_football import obtener_clasificados_por_grupo, mapear_nombre_equipo
-
-    grupos_cerrados = bool(grupos_finalizados(resultados)) if resultados is not None else False
-
-    try:
-        clasif = obtener_clasificados_por_grupo()
-    except Exception:
-        return set()
-
-    primeros = [e for e in clasif.get("primeros", {}).values() if e]
-    segundos = [e for e in clasif.get("segundos", {}).values() if e]
-
-    terceros = []
-    if grupos_cerrados:
-        ranking = clasif.get("ranking_terceros", []) or []
-        if ranking:
-            # Tiebreak oficial FIFA, ya resuelto y mapeado por la API.
-            terceros = [t.get("equipo", "") for t in ranking]
-        else:
-            # Fallback sin ranking de la API: 3º de cada grupo por pts -> DG -> GF.
-            cands = []
-            for grupo, eqs in (clasif.get("standings_completos", {}) or {}).items():
-                gl = str(grupo).lower()
-                if "third" in gl or "ranking of third" in gl:
-                    continue  # saltar el pseudo-grupo de terceros (no es un grupo real)
-                if len(eqs) >= 3:  # defensivo: no asumir índice 2 siempre presente
-                    t = eqs[2]  # lista ya ordenada por rank -> índice 2 = 3º
-                    cands.append((
-                        t.get("puntos", 0), t.get("diferencia", 0),
-                        t.get("goles_favor", 0),
-                        mapear_nombre_equipo(t.get("equipo", "")),
-                    ))
-            cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-            terceros = [c[3] for c in cands]
-        terceros = [e for e in terceros if e][:8]  # clamp duro: nunca más de 8
-
-    # Construcción con prioridad 1º > 2º > 3º y corte defensivo en 32.
-    clasificados = set()
-    for eq in primeros + segundos + terceros:
-        clasificados.add(eq)
-        if grupos_cerrados and len(clasificados) >= 32:
-            break
-    clasificados.discard("")
-    return clasificados
-
-
 def cargar_equipos_clase():
     path = os.path.join("data", "equipos_clase.csv")
     if os.path.exists(path):
@@ -281,32 +201,36 @@ def calcular_todas_las_categorias(resultados):
     }
 
     # 3) Decepción TAMBIÉN al terminar grupos, pero SOLO si un favorito real
-    #    (clase 1) NO está entre los 32 clasificados a 16avos (según standings).
-    #    Es una cuestión de REPRESENTATIVIDAD: que la Decepción oficial sea un
-    #    favorito realmente eliminado, no el clase-1 que clasificó peor.
+    #    (clase 1) NO está en el CUADRO REAL de 16avos de la API. Es una cuestión
+    #    de REPRESENTATIVIDAD: que la Decepción oficial sea un favorito realmente
+    #    eliminado, no el clase-1 que clasificó peor.
     #
-    #    OJO: NO se puede usar fase_maxima acá. Apenas terminan los grupos, los
-    #    fixtures de 16avos de la API todavía no tienen equipos reales (vienen null
-    #    hasta que se arma el cuadro), así que TODOS los equipos tendrían fase_max==0
-    #    —incluidos los que clasificaron— y la condición se dispararía siempre. Por
-    #    eso usamos el set de clasificados de standings (misma fuente que las
-    #    tarjetas de "pasa a 16avos").
+    #    Fuente = el cuadro real (equipos con fase_max>=1, o sea que llegaron a
+    #    16avos o más), la MISMA que usa el scoring de eliminatorias. Antes esto
+    #    salía de standings, pero ese endpoint es frágil: durante los 16avos
+    #    devuelve un "grupo" fantasma (el ranking de terceros) y deja el conteo en
+    #    31, con lo que el viejo candado `>= 32` no se cumplía nunca y la Decepción
+    #    no se resolvía. El cuadro real no tiene ese problema.
+    #
+    #    NO usamos conteo exacto (`== 32`): es frágil ante un faltante por mapeo de
+    #    nombres. Solo exigimos que el bracket esté MATERIALMENTE poblado (umbral
+    #    defensivo) para no disparar falsos positivos en la ventana "grupos recién
+    #    cerrados, fixtures de 16avos todavía sin equipos" (ahí el bracket está
+    #    vacío y se deja pendiente; se resuelve solo cuando la API lo puebla).
     #
     #    Nota: NO se relaciona con la penalidad decepcion_llega_semis. Esa penalidad
     #    evalúa la decepción PRONOSTICADA por cada participante (categorias_pred), no
     #    esta decepción oficial. (Revelación queda intacta: solo se cierra a fin de
     #    torneo.)
     if not torneo_finalizado(resultados) and not equipos_clase.empty:
-        clasificados_16 = obtener_equipos_clasificados_16avos(resultados)
-        # Exigimos las 32 plazas COMPLETAS antes de decidir. grupos_finalizados()
-        # mira los FIXTURES, pero los standings vienen de OTRO endpoint y pueden
-        # llegar parciales (solo algunos de los 12 grupos). Con un set incompleto,
-        # un clase-1 que SÍ clasificó podría contar como "no clasificado" -> falsa
-        # Decepción. Si faltan plazas (o no hay standings), dejamos pendiente.
-        if len(clasificados_16) >= 32:
+        bracket_real = {eq for eq, mx in fase_maxima.items() if mx >= 1}
+        # "Poblado" = el cuadro de 16avos ya está armado. >=24 es muy superior a la
+        # ventana vacía/parcial (la API publica las 16 llaves -> 32 equipos- juntas)
+        # y tolera un faltante por mapeo sin trabarse en un número exacto.
+        if len(bracket_real) >= 24:
             clase_1 = equipos_clase[equipos_clase["clase"] == 1]
             hay_favorito_eliminado = any(
-                pais not in clasificados_16 for pais in clase_1["pais"]
+                pais not in bracket_real for pais in clase_1["pais"]
             )
             if hay_favorito_eliminado:
                 categorias["Decepción"] = determinar_decepcion(equipos_clase, fase_maxima, tabla_grupos)
