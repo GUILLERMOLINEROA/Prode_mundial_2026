@@ -299,20 +299,28 @@ def calcular_penalidades(
     3. Peor equipo predicho pasa de grupos: -10
     4. Decepción predicha llega a semis: -20
 
+    ASIMETRÍA con el provisional en vivo: las penalidades se evalúan SOLO sobre
+    partidos terminados. Lee la vista "penalidades" (terminados) de
+    equipos_reales_por_ronda, que NO incluye los líderes en vivo del pase, así un
+    campeón perdiendo en vivo no dispara un -20 fantasma. (Fallback al dict plano
+    para compatibilidad de los tests que pasan la estructura vieja.)
+
     Regla de seguridad:
-    - Las penalidades ligadas a 16vos solo se evalúan cuando hay 32 equipos reales.
-    - La penalidad ligada a 4tos solo se evalúa cuando hay 8 equipos reales.
-    - La penalidad ligada a semis solo se evalúa cuando hay 4 equipos reales.
+    - Revelación / Peor equipo solo se evalúan con la ronda de 16avos completa (32).
+    - Decepción solo se evalúa con las semis completas (4).
+    - Campeón: se aplica el -20 en cuanto está en `eliminados_pre_4tos` (perdedor de
+      un 16avos/8vos terminado, o eliminado en grupos con el bracket poblado). Gatillo
+      directo, sin conteo ==N; idempotente (cuando la API arme cuartos no se duplica).
     """
     pen_total = 0
     razones = []
 
-    eq_16vos_real = equipos_reales_por_ronda.get("16vos", set())
-    eq_4tos_real = equipos_reales_por_ronda.get("4tos", set())
-    eq_semis_real = equipos_reales_por_ronda.get("semis", set())
+    pen = equipos_reales_por_ronda.get("penalidades", equipos_reales_por_ronda)
+    eq_16vos_real = pen.get("16vos", set())
+    eq_semis_real = pen.get("semis", set())
+    eliminados_pre_4tos = pen.get("eliminados_pre_4tos", set())
 
     fase_16vos_completa = len(eq_16vos_real) == 32
-    fase_4tos_completa = len(eq_4tos_real) == 8
     fase_semis_completa = len(eq_semis_real) == 4
 
     # 1. Revelación se queda en grupos (solo con la ronda de 16avos completa).
@@ -326,15 +334,16 @@ def calcular_penalidades(
                 f"{PENALIDADES['revelacion_queda_grupos']} pts"
             )
 
-    # 2. Campeón no llega a 4tos
+    # 2. Campeón no llega a 4tos: -20 en cuanto está eliminado antes de cuartos
+    #    (perdedor de un 16avos/8vos TERMINADO, o eliminado en grupos). Hecho directo,
+    #    sin esperar a que la API arme cuartos. Nunca en vivo.
     campeon_pred = categorias_pred.get("Campeon", "").strip()
-    if campeon_pred and fase_4tos_completa:
-        if campeon_pred not in eq_4tos_real:
-            pen_total += PENALIDADES["campeon_no_llega_4tos"]
-            razones.append(
-                f"💀 Tu campeón ({campeon_pred}) no llegó ni a cuartos: "
-                f"{PENALIDADES['campeon_no_llega_4tos']} pts"
-            )
+    if campeon_pred and campeon_pred in eliminados_pre_4tos:
+        pen_total += PENALIDADES["campeon_no_llega_4tos"]
+        razones.append(
+            f"💀 Tu campeón ({campeon_pred}) no llegó ni a cuartos: "
+            f"{PENALIDADES['campeon_no_llega_4tos']} pts"
+        )
 
     # 3. Peor equipo pasa de grupos (solo con la ronda de 16avos completa).
     #    Se saltea si el participante eligió no apostar (centinela de no-apuesta).

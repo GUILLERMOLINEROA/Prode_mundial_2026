@@ -46,6 +46,16 @@ def _ganador_eliminatoria(p):
 
 
 def extraer_equipos_reales_por_ronda(resultados):
+    """
+    Arma el set de equipos por ronda con DOS vistas separadas a propósito:
+
+      - Las claves 16vos..final son la vista del PASE (scoring del +N): ganadores de
+        partidos terminados propagados a la ronda siguiente.
+      - La clave "penalidades" es la vista TERMINADOS (autoritativa para
+        calcular_penalidades), que incluye `eliminados_pre_4tos`. Separar las vistas
+        deja lista la inyección del provisional en vivo (cambio siguiente) sin que
+        contamine las penalidades.
+    """
     if resultados.empty:
         return {}
     fase_maxima = {}
@@ -64,23 +74,43 @@ def extraer_equipos_reales_por_ronda(resultados):
         if mx >= 4: equipos["semis"].add(eq)
         if mx >= 5: equipos["final"].add(eq)
 
-    # ELIMINATORIA: el que gana pasa, no hay reglas de clasificación. Apenas un
-    # cruce termina (FT/AET/PEN), el ganador suma la ronda SIGUIENTE sin esperar a
-    # que la API publique ese fixture (que tarda). Se agrega al MISMO set que lee el
-    # scoring -> una sola fuente, un solo camino de puntaje. Anti-doble-conteo: es un
-    # set, así que cuando la API publique el cruce real el union no duplica y el +N
-    # se otorga una sola vez por equipo. Solo eliminatoria (en grupos ganar no
-    # implica pasar) y solo partidos terminados (nada provisional en vivo).
     siguiente_ronda = {"16vos": "8vos", "8vos": "4tos", "4tos": "semis", "semis": "final"}
+
+    # --- VISTA TERMINADOS (para penalidades) ---
+    # El que gana un cruce TERMINADO pasa a la ronda siguiente (sin esperar el cuadro
+    # de la API). El PERDEDOR de 16avos/8vos queda "eliminado antes de cuartos". `term`
+    # es una vista SEPARADA del pase: solo FT/AET/PEN, para que el provisional en vivo
+    # de abajo no la contamine.
+    term = {r: set(s) for r, s in equipos.items()}
+    eliminados_pre_4tos = set()
     for _, p in resultados.iterrows():
         if str(p.get("estado", "") or "").strip() not in ESTADOS_FINALIZADO:
             continue
-        sig = siguiente_ronda.get(clasificar_ronda(str(p.get("ronda", ""))))
+        ronda = clasificar_ronda(str(p.get("ronda", "")))
+        sig = siguiente_ronda.get(ronda)
         if not sig:
             continue  # grupos / final / 3er puesto: no propagan acá
         ganador = _ganador_eliminatoria(p)
-        if ganador:
-            equipos[sig].add(mapear_nombre_equipo(ganador))
+        if not ganador:
+            continue
+        loc, vis = p.get("equipo_local", ""), p.get("equipo_visitante", "")
+        perdedor = vis if ganador == loc else loc
+        equipos[sig].add(mapear_nombre_equipo(ganador))
+        term[sig].add(mapear_nombre_equipo(ganador))
+        if ronda in ("16vos", "8vos"):
+            eliminados_pre_4tos.add(mapear_nombre_equipo(perdedor))
+    # Campeón eliminado en FASE DE GRUPOS: una vez poblado el bracket (>=24, umbral
+    # defensivo, no conteo ==N), los equipos con fase_max==0 quedan eliminados.
+    if len(term["16vos"]) >= 24:
+        eliminados_pre_4tos |= {mapear_nombre_equipo(eq) for eq, mx in fase_maxima.items() if mx == 0}
+
+    # Facts TERMINADOS para las penalidades (vista separada del pase).
+    equipos["penalidades"] = {
+        "16vos": term["16vos"],
+        "4tos": term["4tos"],
+        "semis": term["semis"],
+        "eliminados_pre_4tos": eliminados_pre_4tos,
+    }
     return equipos
 
 

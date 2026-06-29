@@ -11,8 +11,11 @@ from utils.data_loader import (
     _ganador_eliminatoria, extraer_equipos_reales_por_ronda,
     determinar_campeon_y_tercero, construir_puntajes,
 )
-from utils.scoring import calcular_puntos_eliminatorias, calcular_puntuacion_total, PUNTOS
-from tests._builders import df_resultados, partido, df_apuestas, apuesta, total_results
+from utils.scoring import (
+    calcular_puntos_eliminatorias, calcular_puntuacion_total, calcular_penalidades,
+    PUNTOS, PENALIDADES,
+)
+from tests._builders import df_resultados, partido, df_apuestas, apuesta, total_results, round_of_32
 
 
 class TestGanadorEliminatoria(unittest.TestCase):
@@ -48,7 +51,7 @@ class TestExtraerEquiposReales(unittest.TestCase):
         self.assertIn("GER", eqr["8vos"])      # ganó la tanda
         self.assertNotIn("FRA", eqr["8vos"])   # perdió la tanda (marcador empatado)
         self.assertNotIn("ZZZ", eqr["8vos"])   # ganó en grupos, no propaga
-        self.assertNotIn("LIVE", eqr["8vos"])  # partido en curso
+        self.assertNotIn("LIVE", eqr["8vos"])  # partido en curso (sin live todavía)
 
     def test_anti_doble_conteo_con_fixture_api(self):  # REGRESIÓN #6
         # ARG gana su 16avos (propaga a 8vos) Y la API ya publicó el R16 con ARG.
@@ -97,6 +100,46 @@ class TestCampeonTercero(unittest.TestCase):
         res = df_resultados([partido("ARG", "FRA", 1, 0, ronda="Semi-finals", estado="FT")])
         campeon, tercero = determinar_campeon_y_tercero(res)
         self.assertEqual((campeon, tercero), ("", ""))
+
+
+class TestPenalidadCampeon(unittest.TestCase):
+    """Cambio 1: -20 en cuanto el campeón queda eliminado antes de cuartos.
+    Asimetría: NUNCA en vivo (lee la vista terminados)."""
+    def _pen(self, resultados, campeon):
+        eqr = extraer_equipos_reales_por_ronda(resultados)
+        pen, _ = calcular_penalidades({"Campeon": campeon}, {}, eqr)
+        return pen
+
+    def test_eliminado_en_16avos_resta_20(self):
+        res = df_resultados([partido("Brasil", "Japon", 2, 1, ronda="Round of 32", estado="FT")])
+        self.assertEqual(self._pen(res, "Japon"), PENALIDADES["campeon_no_llega_4tos"])
+
+    def test_idempotente_con_cuartos_poblado(self):
+        # Eliminado en 16avos + cuartos ya poblado por la API -> -20 una SOLA vez.
+        teams = [f"T{i:02d}" for i in range(8)]
+        res = df_resultados(
+            [partido("Brasil", "Japon", 2, 1, ronda="Round of 32", estado="FT")]
+            + [partido(teams[2*i], teams[2*i+1], None, None, ronda="Quarter-finals", estado="NS")
+               for i in range(4)]
+        )
+        self.assertEqual(self._pen(res, "Japon"), PENALIDADES["campeon_no_llega_4tos"])
+
+    def test_llego_a_cuartos_no_penaliza(self):
+        # El campeón aparece en un fixture de cuartos -> reachó cuartos -> sin penalidad.
+        res = df_resultados([partido("Japon", "X", None, None, ronda="Quarter-finals", estado="NS")])
+        self.assertEqual(self._pen(res, "Japon"), 0)
+
+    def test_clasifico_pero_no_jugo_no_penaliza(self):
+        # Bracket poblado (32 en 16avos), el campeón clasificó pero su 16avos no se jugó.
+        res = df_resultados(round_of_32([f"T{i:02d}" for i in range(32)], estado="NS"))
+        self.assertEqual(self._pen(res, "T00"), 0)
+
+    def test_eliminado_en_grupos_con_bracket_poblado_resta_20(self):
+        res = df_resultados(
+            [partido("Japon", "X", 0, 1, ronda="Group Stage - 1", estado="FT")]
+            + round_of_32([f"T{i:02d}" for i in range(32)], estado="NS")
+        )
+        self.assertEqual(self._pen(res, "Japon"), PENALIDADES["campeon_no_llega_4tos"])
 
 
 class TestConstruirPuntajes(unittest.TestCase):

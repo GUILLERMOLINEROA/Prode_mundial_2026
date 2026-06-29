@@ -12,11 +12,12 @@ from utils.scoring import calcular_penalidades, PENALIDADES
 from tests._builders import equipos
 
 
-def reales(eq16=None, eq4=None, eqsemis=None):
+def reales(eq16=None, eq4=None, eqsemis=None, eliminados=None):
     return {
         "16vos": eq16 if eq16 is not None else set(),
         "4tos": eq4 if eq4 is not None else set(),
         "semis": eqsemis if eqsemis is not None else set(),
+        "eliminados_pre_4tos": eliminados if eliminados is not None else set(),
     }
 
 
@@ -53,11 +54,14 @@ class TestPenalidades(unittest.TestCase):
         self.assertEqual(pen, 0)
 
     def test_campeon_no_llega_a_4tos_resta_20(self):
-        pen, _ = calcular_penalidades({"Campeon": "ZZZ"}, {}, reales(eq4=SET8))
+        # Nuevo gatillo: el campeón está en eliminados_pre_4tos (perdedor de
+        # 16avos/8vos terminado o eliminado en grupos), sin conteo ==N.
+        pen, _ = calcular_penalidades({"Campeon": "ZZZ"}, {}, reales(eliminados={"ZZZ"}))
         self.assertEqual(pen, PENALIDADES["campeon_no_llega_4tos"])
 
-    def test_campeon_llega_a_4tos_no_penaliza(self):
-        pen, _ = calcular_penalidades({"Campeon": "Q0"}, {}, reales(eq4=SET8))
+    def test_campeon_no_eliminado_no_penaliza(self):
+        # El campeón NO está en eliminados (sigue vivo / clasificó) -> sin penalidad.
+        pen, _ = calcular_penalidades({"Campeon": "ARG"}, {}, reales(eliminados={"BRA"}))
         self.assertEqual(pen, 0)
 
     def test_decepcion_llega_a_semis_resta_20(self):
