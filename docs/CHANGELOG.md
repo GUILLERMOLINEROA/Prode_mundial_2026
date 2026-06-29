@@ -1,5 +1,48 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — Penalidad del campeón temprana + pase provisional en vivo (asimetría)
+
+Dos cambios en eliminatoria que comparten la misma idea ("el partido terminó, la consecuencia
+se aplica ya") pero con una **asimetría intencional**: el **pase** se mueve en vivo, las
+**penalidades** solo con el partido terminado.
+
+Commits: `9757214` (penalidad campeón) + el de este push (provisional en vivo).
+
+### Cambio 1 — Penalidad del campeón al quedar eliminado antes de cuartos
+`campeon_no_llega_4tos` (−20) se aplicaba recién con cuartos poblado (`len(eq_4tos)==8`). Ahora
+se aplica **en cuanto el campeón queda eliminado antes de cuartos**, sin esperar a que la API
+arme el cuadro. Hecho directo: el campeón es **perdedor de un 16avos/8vos terminado** (∪
+eliminado en grupos, con el bracket poblado `>=24`). Gatillo único por membership en
+`eliminados_pre_4tos`, **sin conteo `==N`** (sale del landmine de pendientes para esta penalidad)
+e **idempotente** (un solo `if`; cuando la API arme cuartos no se duplica).
+
+### Cambio 2 — Pase provisional EN VIVO
+El **+N del pase a la ronda siguiente** se mueve **en vivo** según el marcador y se congela al
+pitazo (FT/AET/PEN, incluido alargue y penales). El que va ganando suma provisionalmente; **empate
+en vivo = nadie**; durante la tanda de penales (`P`) el marcador está empatado → nadie hasta `PEN`.
+Es una **decisión consciente que revierte el criterio anterior de "solo al terminar"** — pero
+**solo para el pase**, NO para las penalidades. El parpadeo del leaderboard durante los partidos
+es esperado.
+
+### La asimetría (cómo se garantiza)
+`extraer_equipos_reales_por_ronda` arma **dos vistas separadas**: las claves de ronda
+(`16vos..final`) son la vista del **pase** (incluye líderes en vivo, la lee el scoring del +N), y
+la clave **`"penalidades"`** es la vista **TERMINADOS** (solo FT/AET/PEN), que lee
+`calcular_penalidades`. Como esa vista se construye filtrando `estado in ESTADOS_FINALIZADO`, un
+líder en vivo **físicamente no puede entrar** → un campeón (o una decepción) perdiendo en vivo
+**nunca** dispara una penalidad fantasma. Verificado con datos reales (Alemania 1-1 Paraguay en
+vivo → nadie suma el pase y Alemania no aparece en `eliminados_pre_4tos`).
+
+### Tests
+Suite **94 verde**. Nuevos: `TestProvisionalEnVivo` (líder suma, empate→nadie, cambio de líder,
+penales en curso→nadie, congela al FT) y `TestPenalidadCampeon` (eliminado en 16avos, idempotente
+con cuartos poblado, llegó a cuartos, clasificó sin jugar, eliminado en grupos, y el crítico
+**campeón perdiendo en vivo → 0 hasta el pitazo**). Actualizados (comportamiento cambiado a
+propósito): el test de "en curso no propaga" → ahora "el líder en vivo SÍ propaga"; y el gatillo
+del campeón (`==8` → `eliminados_pre_4tos`).
+
+---
+
 ## 2026-06-28 — En eliminatoria, el ganador suma la ronda siguiente sin esperar el cuadro de la API
 
 En mata-mata el que gana pasa (no hay reglas de clasificación como en grupos), pero el +N

@@ -38,20 +38,21 @@ class TestGanadorEliminatoria(unittest.TestCase):
 
 
 class TestExtraerEquiposReales(unittest.TestCase):
-    def test_ganador_propaga_penales_grupos_y_envivo(self):  # REGRESIÓN #5
+    def test_ganador_propaga_penales_grupos_y_lider_en_vivo(self):  # REGRESIÓN #5 (act. Cambio 2)
         res = df_resultados([
             partido("ARG", "BRA", 1, 0, ronda="Round of 32", estado="FT"),       # ARG -> 8vos
             partido("GER", "FRA", 1, 1, ronda="Round of 32", estado="PEN",
                     pen_l=5, pen_v=4),                                            # GER (tanda) -> 8vos
             partido("ZZZ", "WWW", 1, 0, ronda="Group Stage - 1", estado="FT"),   # grupos: NO propaga
-            partido("LIVE", "DEAD", 2, 0, ronda="Round of 32", estado="2H"),     # en curso: NO propaga
+            partido("LIVE", "DEAD", 2, 0, ronda="Round of 32", estado="2H"),     # en curso: el LÍDER propaga
         ])
         eqr = extraer_equipos_reales_por_ronda(res)
         self.assertIn("ARG", eqr["8vos"])
         self.assertIn("GER", eqr["8vos"])      # ganó la tanda
         self.assertNotIn("FRA", eqr["8vos"])   # perdió la tanda (marcador empatado)
         self.assertNotIn("ZZZ", eqr["8vos"])   # ganó en grupos, no propaga
-        self.assertNotIn("LIVE", eqr["8vos"])  # partido en curso (sin live todavía)
+        self.assertIn("LIVE", eqr["8vos"])     # Cambio 2: el líder en vivo SÍ propaga (provisional)
+        self.assertNotIn("DEAD", eqr["8vos"])  # el que va perdiendo en vivo no propaga
 
     def test_anti_doble_conteo_con_fixture_api(self):  # REGRESIÓN #6
         # ARG gana su 16avos (propaga a 8vos) Y la API ya publicó el R16 con ARG.
@@ -102,6 +103,35 @@ class TestCampeonTercero(unittest.TestCase):
         self.assertEqual((campeon, tercero), ("", ""))
 
 
+class TestProvisionalEnVivo(unittest.TestCase):
+    """Cambio 2: el líder de un partido EN CURSO suma provisionalmente el pase."""
+    def _8vos(self, gl, gv, estado, pen_l=None, pen_v=None):
+        res = df_resultados([partido("ARG", "BRA", gl, gv, ronda="Round of 32",
+                                     estado=estado, pen_l=pen_l, pen_v=pen_v)])
+        return extraer_equipos_reales_por_ronda(res)["8vos"]
+
+    def test_lider_en_vivo_suma_el_pase(self):
+        s = self._8vos(1, 0, "2H")
+        self.assertIn("ARG", s)
+        self.assertNotIn("BRA", s)
+
+    def test_empate_en_vivo_nadie_suma(self):
+        self.assertEqual(self._8vos(1, 1, "2H"), set())
+
+    def test_cambio_de_lider_en_vivo(self):
+        self.assertIn("BRA", self._8vos(0, 1, "2H"))  # ahora va ganando el visitante
+
+    def test_penales_en_curso_nadie(self):
+        # estado P: el marcador sigue empatado (la tanda no decide hasta PEN) -> nadie.
+        self.assertEqual(self._8vos(1, 1, "P", pen_l=3, pen_v=2), set())
+
+    def test_congela_al_terminar(self):
+        # FT 1-2: congela con el resultado real (gana BRA), sin importar quién iba.
+        s = self._8vos(1, 2, "FT")
+        self.assertIn("BRA", s)
+        self.assertNotIn("ARG", s)
+
+
 class TestPenalidadCampeon(unittest.TestCase):
     """Cambio 1: -20 en cuanto el campeón queda eliminado antes de cuartos.
     Asimetría: NUNCA en vivo (lee la vista terminados)."""
@@ -140,6 +170,15 @@ class TestPenalidadCampeon(unittest.TestCase):
             + round_of_32([f"T{i:02d}" for i in range(32)], estado="NS")
         )
         self.assertEqual(self._pen(res, "Japon"), PENALIDADES["campeon_no_llega_4tos"])
+
+    def test_campeon_perdiendo_en_vivo_NO_penaliza_hasta_terminar(self):  # CRÍTICO (invariante #1)
+        # Japón va perdiendo 1-2 en vivo (2H): el líder (Brasil) suma el pase, pero
+        # Japón NO está eliminado hasta el pitazo -> sin -20 fantasma.
+        res = df_resultados([partido("Brasil", "Japon", 2, 1, ronda="Round of 32", estado="2H")])
+        eqr = extraer_equipos_reales_por_ronda(res)
+        self.assertIn("Brasil", eqr["8vos"])                                # pase provisional al líder
+        self.assertEqual(eqr["penalidades"]["eliminados_pre_4tos"], set())  # nadie eliminado aún
+        self.assertEqual(self._pen(res, "Japon"), 0)                        # campeón perdiendo NO penaliza
 
 
 class TestConstruirPuntajes(unittest.TestCase):

@@ -4,7 +4,7 @@ import os
 import json
 
 from utils.excel_reader import cargar_todos_los_participantes
-from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados, ESTADOS_FINALIZADO
+from utils.api_football import mapear_nombre_equipo, clasificar_ronda, obtener_partidos_mundial, obtener_ultimos_resultados, ESTADOS_FINALIZADO, ESTADOS_EN_VIVO
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
 from utils.special_categories import calcular_todas_las_categorias, grupos_finalizados, torneo_finalizado
 from utils.group_config import overrides_path, fotos_dir
@@ -45,16 +45,34 @@ def _ganador_eliminatoria(p):
     return None
 
 
+def _lider_en_vivo(p):
+    """
+    Equipo que va GANANDO un partido EN CURSO, por el marcador actual (incluye
+    alargue). Empate -> None (nadie suma el pase). Durante la tanda de penales
+    (estado 'P') el marcador está empatado -> None hasta que cierre en PEN.
+    """
+    gl, gv = p.get("goles_local"), p.get("goles_visitante")
+    if pd.isna(gl) or pd.isna(gv):
+        return None
+    gl, gv = int(gl), int(gv)
+    if gl > gv:
+        return p.get("equipo_local", "")
+    if gv > gl:
+        return p.get("equipo_visitante", "")
+    return None
+
+
 def extraer_equipos_reales_por_ronda(resultados):
     """
     Arma el set de equipos por ronda con DOS vistas separadas a propósito:
 
-      - Las claves 16vos..final son la vista del PASE (scoring del +N): ganadores de
-        partidos terminados propagados a la ronda siguiente.
+      - Las claves 16vos..final son la vista del PASE (scoring del +N): incluyen
+        ganadores de partidos terminados Y líderes de partidos EN CURSO (provisional
+        en vivo). El +N se mueve con el marcador y congela al pitazo.
       - La clave "penalidades" es la vista TERMINADOS (autoritativa para
-        calcular_penalidades), que incluye `eliminados_pre_4tos`. Separar las vistas
-        deja lista la inyección del provisional en vivo (cambio siguiente) sin que
-        contamine las penalidades.
+        calcular_penalidades): se arma SOLO con partidos FT/AET/PEN, así el
+        provisional en vivo NUNCA contamina las penalidades (un campeón perdiendo en
+        vivo no está "eliminado" hasta el pitazo). Incluye `eliminados_pre_4tos`.
     """
     if resultados.empty:
         return {}
@@ -104,7 +122,22 @@ def extraer_equipos_reales_por_ronda(resultados):
     if len(term["16vos"]) >= 24:
         eliminados_pre_4tos |= {mapear_nombre_equipo(eq) for eq, mx in fase_maxima.items() if mx == 0}
 
-    # Facts TERMINADOS para las penalidades (vista separada del pase).
+    # --- VISTA DEL PASE: provisional EN VIVO (solo scoring del +N, NUNCA penalidades) ---
+    # El que va ganando un partido EN CURSO suma provisionalmente el pase; empate ->
+    # nadie. Se agrega SOLO a `equipos` (pase), nunca a `term`. Anti-doble: es un set,
+    # y un partido está en vivo XOR terminado -> el líder y el ganador no se suman dos
+    # veces; cuando la API pueble el cuadro, el union tampoco duplica.
+    for _, p in resultados.iterrows():
+        if str(p.get("estado", "") or "").strip() not in ESTADOS_EN_VIVO:
+            continue
+        sig = siguiente_ronda.get(clasificar_ronda(str(p.get("ronda", ""))))
+        if not sig:
+            continue
+        lider = _lider_en_vivo(p)
+        if lider:
+            equipos[sig].add(mapear_nombre_equipo(lider))
+
+    # Facts TERMINADOS para las penalidades (separados de la vista del pase en vivo).
     equipos["penalidades"] = {
         "16vos": term["16vos"],
         "4tos": term["4tos"],
