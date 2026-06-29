@@ -181,6 +181,20 @@ class TestPenalidadCampeon(unittest.TestCase):
         self.assertEqual(self._pen(res, "Japon"), 0)                        # campeón perdiendo NO penaliza
 
 
+class TestPenalidadRevelacionIntegracion(unittest.TestCase):
+    """extraer puebla grupos_jugados; la revelación penaliza por hecho directo."""
+    def test_revelacion_jugo_grupos_y_no_clasifico_resta_20(self):
+        # 'Reve' jugó un grupo y NO está en el bracket de 32 -> -20.
+        res = df_resultados(
+            [partido("Reve", "X", 0, 1, ronda="Group Stage - 1", estado="FT")]
+            + round_of_32([f"T{i:02d}" for i in range(32)], estado="NS")
+        )
+        eqr = extraer_equipos_reales_por_ronda(res)
+        self.assertIn("Reve", eqr["penalidades"]["grupos_jugados"])
+        pen, _ = calcular_penalidades({"Revelación": "Reve"}, {}, eqr)
+        self.assertEqual(pen, PENALIDADES["revelacion_queda_grupos"])
+
+
 class TestConstruirPuntajes(unittest.TestCase):
     def _datos(self):
         resultados = df_resultados([

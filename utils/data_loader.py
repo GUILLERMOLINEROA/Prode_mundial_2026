@@ -77,6 +77,7 @@ def extraer_equipos_reales_por_ronda(resultados):
     if resultados.empty:
         return {}
     fase_maxima = {}
+    grupos_jugados = set()  # equipos que jugaron la fase de grupos (hecho directo)
     orden_fases = {"grupos": 0, "16vos": 1, "8vos": 2, "4tos": 3, "semis": 4, "final": 5}
     for _, p in resultados.iterrows():
         ronda = clasificar_ronda(str(p.get("ronda", "")))
@@ -84,6 +85,8 @@ def extraer_equipos_reales_por_ronda(resultados):
         for eq in [p.get("equipo_local", ""), p.get("equipo_visitante", "")]:
             if eq:
                 fase_maxima[eq] = max(fase_maxima.get(eq, -1), orden)
+                if ronda == "grupos":
+                    grupos_jugados.add(eq)
     equipos = {"16vos": set(), "8vos": set(), "4tos": set(), "semis": set(), "final": set()}
     for eq, mx in fase_maxima.items():
         if mx >= 1: equipos["16vos"].add(eq)
@@ -143,6 +146,7 @@ def extraer_equipos_reales_por_ronda(resultados):
         "4tos": term["4tos"],
         "semis": term["semis"],
         "eliminados_pre_4tos": eliminados_pre_4tos,
+        "grupos_jugados": grupos_jugados,
     }
     return equipos
 

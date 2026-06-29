@@ -305,12 +305,15 @@ def calcular_penalidades(
     campeón perdiendo en vivo no dispara un -20 fantasma. (Fallback al dict plano
     para compatibilidad de los tests que pasan la estructura vieja.)
 
-    Regla de seguridad:
-    - Revelación / Peor equipo solo se evalúan con la ronda de 16avos completa (32).
-    - Decepción solo se evalúa con las semis completas (4).
-    - Campeón: se aplica el -20 en cuanto está en `eliminados_pre_4tos` (perdedor de
-      un 16avos/8vos terminado, o eliminado en grupos con el bracket poblado). Gatillo
-      directo, sin conteo ==N; idempotente (cuando la API arme cuartos no se duplica).
+    Gatillos por HECHO DIRECTO (sin conteo ==N; membership en la vista terminados):
+    - Revelación: jugó grupos y NO clasificó (`in grupos_jugados`, bracket poblado
+      `>=24`, y `not in eq_16vos`). El guard "jugó grupos" + ">=24" evita el falso
+      positivo del `not in` con bracket parcial o nombre mal mapeado.
+    - Peor equipo: pasó de grupos (`peor in eq_16vos`). El `in` no da falso positivo.
+    - Decepción: llegó a semis (`decepcion in eq_semis`) -> dispara apenas gana su
+      cuarto, sin esperar a que se definan los otros 3 semifinalistas.
+    - Campeón: en `eliminados_pre_4tos`. Idempotente (un solo if; cuando la API arme
+      cuartos no se duplica).
     """
     pen_total = 0
     razones = []
@@ -319,20 +322,22 @@ def calcular_penalidades(
     eq_16vos_real = pen.get("16vos", set())
     eq_semis_real = pen.get("semis", set())
     eliminados_pre_4tos = pen.get("eliminados_pre_4tos", set())
+    grupos_jugados = pen.get("grupos_jugados", set())
 
-    fase_16vos_completa = len(eq_16vos_real) == 32
-    fase_semis_completa = len(eq_semis_real) == 4
-
-    # 1. Revelación se queda en grupos (solo con la ronda de 16avos completa).
+    # 1. Revelación se queda en grupos: jugó grupos y NO clasificó. Hecho directo, no
+    #    "ausencia del bracket": el guard `in grupos_jugados` + bracket poblado (>=24)
+    #    evita el falso positivo del `not in` con bracket parcial o nombre mal mapeado.
     #    Se saltea si el participante eligió no apostar (p.ej. "No hay Revelación").
     revelacion = categorias_pred.get("Revelación", "").strip()
-    if revelacion and not _es_no_apuesta(revelacion) and fase_16vos_completa:
-        if revelacion not in eq_16vos_real:
-            pen_total += PENALIDADES["revelacion_queda_grupos"]
-            razones.append(
-                f"🪦 Tu revelación ({revelacion}) se quedó en grupos: "
-                f"{PENALIDADES['revelacion_queda_grupos']} pts"
-            )
+    if (revelacion and not _es_no_apuesta(revelacion)
+            and revelacion in grupos_jugados
+            and len(eq_16vos_real) >= 24
+            and revelacion not in eq_16vos_real):
+        pen_total += PENALIDADES["revelacion_queda_grupos"]
+        razones.append(
+            f"🪦 Tu revelación ({revelacion}) se quedó en grupos: "
+            f"{PENALIDADES['revelacion_queda_grupos']} pts"
+        )
 
     # 2. Campeón no llega a 4tos: -20 en cuanto está eliminado antes de cuartos
     #    (perdedor de un 16avos/8vos TERMINADO, o eliminado en grupos). Hecho directo,
@@ -345,26 +350,25 @@ def calcular_penalidades(
             f"{PENALIDADES['campeon_no_llega_4tos']} pts"
         )
 
-    # 3. Peor equipo pasa de grupos (solo con la ronda de 16avos completa).
-    #    Se saltea si el participante eligió no apostar (centinela de no-apuesta).
+    # 3. Peor equipo pasa de grupos: membership directa (peor in eq_16vos). El `in` no
+    #    da falso positivo por bracket incompleto. Se saltea el centinela de no-apuesta.
     peor = categorias_pred.get("Peor Equipo", "").strip()
-    if peor and not _es_no_apuesta(peor) and fase_16vos_completa:
-        if peor in eq_16vos_real:
-            pen_total += PENALIDADES["peor_pasa_grupos"]
-            razones.append(
-                f"😂 Tu 'peor equipo' ({peor}) pasó de grupos: "
-                f"{PENALIDADES['peor_pasa_grupos']} pts"
-            )
+    if peor and not _es_no_apuesta(peor) and peor in eq_16vos_real:
+        pen_total += PENALIDADES["peor_pasa_grupos"]
+        razones.append(
+            f"😂 Tu 'peor equipo' ({peor}) pasó de grupos: "
+            f"{PENALIDADES['peor_pasa_grupos']} pts"
+        )
 
-    # 4. Decepción llega a semis
+    # 4. Decepción llega a semis: membership directa (decepcion in eq_semis) -> dispara
+    #    apenas la decepción gana su 4to, sin esperar a los otros 3 semifinalistas.
     decepcion = categorias_pred.get("Decepción", "").strip()
-    if decepcion and fase_semis_completa:
-        if decepcion in eq_semis_real:
-            pen_total += PENALIDADES["decepcion_llega_semis"]
-            razones.append(
-                f"🤡 Tu decepción ({decepcion}) llegó a SEMIS: "
-                f"{PENALIDADES['decepcion_llega_semis']} pts"
-            )
+    if decepcion and decepcion in eq_semis_real:
+        pen_total += PENALIDADES["decepcion_llega_semis"]
+        razones.append(
+            f"🤡 Tu decepción ({decepcion}) llegó a SEMIS: "
+            f"{PENALIDADES['decepcion_llega_semis']} pts"
+        )
 
     return pen_total, razones
 

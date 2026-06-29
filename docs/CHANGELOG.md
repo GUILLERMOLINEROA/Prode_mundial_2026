@@ -1,5 +1,37 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — Penalidades de revelación/peor/decepción-semis por hecho directo (cierra el pendiente ==N)
+
+Las 3 penalidades que quedaban con conteo exacto `==N` (el landmine que traba en silencio con un
+nombre mal mapeado) pasan a **hecho directo + membership**, mismo patrón que ya aplicamos al
+campeón. **Cierra el pendiente `==N` de las penalidades.** Siguen leyendo la **vista terminados**
+(nunca disparan por un líder en vivo) y son idempotentes (un `if` cada una).
+
+- **`peor_pasa_grupos` (−10):** `peor in eq_16vos` directo, sin conteo. El `in` no da falso
+  positivo por bracket incompleto.
+- **`decepcion_llega_semis` (−20):** `decepcion in eq_semis` directo. Arregla **dos** cosas: saca
+  el `==4` y dispara **apenas la decepción gana su cuarto**, sin esperar a que se definan los
+  otros 3 semifinalistas.
+- **`revelacion_queda_grupos` (−20):** hecho directo "**jugó grupos y no clasificó**":
+  `revelacion in grupos_jugados` (set nuevo en la vista "penalidades", equipos que aparecen en
+  fixtures de grupos) **+** bracket poblado `len(eq_16vos) >= 24` **+** `revelacion not in eq_16vos`.
+  El guard "jugó grupos" + `>=24` cierra de raíz el falso positivo del `not in`: ni con bracket
+  parcial (no evalúa hasta `>=24`) ni con un nombre mal mapeado/typo (si no jugó grupos, no
+  penaliza). Y escapa al trap del `==32` (con el bracket en 31 igual evalúa).
+
+**Nota:** este `==N` era sobre los sets de **fixtures** (`16vos`/`semis`), distinto del `==N` de
+**standings** (pseudo-grupo de terceros en `obtener_clasificados_por_grupo`) — así que este
+arreglo **no arrastra** esa raíz; aquella sigue siendo un tema aparte de standings, que ya no usan
+estas penalidades.
+
+Tests: **101 verde**. Discriminantes nuevos (fallarían bajo el `==N` viejo): decepción con semis
+incompletas→−20, peor con bracket chico→−10, revelación con bracket a 31→−20 (escapa al trap),
+revelación con bracket parcial→0 (el borde) y revelación que no jugó grupos→0 (guard). Actualizados
+(comportamiento cambiado a propósito): los que asumían `==32`/`==4` ahora pasan `grupos_jugados` y
+prueban `>=`/`in`.
+
+---
+
 ## 2026-06-28 — Penalidad del campeón temprana + pase provisional en vivo (asimetría)
 
 Dos cambios en eliminatoria que comparten la misma idea ("el partido terminó, la consecuencia
@@ -166,13 +198,15 @@ Lista consolidada de temas conocidos sin resolver, para no perderlos de vista.
      lado del acierto en `calcular_puntos_categorias`.
    - Inclinación tentativa hacia B por coherencia. Sin urgencia (solo aplica al cierre).
 
-2. **`== 32` exacto en `calcular_penalidades`** (introducido por el commit `a539430`, NO por
-   esta sesión). La condición `len(eq_16vos_real) == 32` **traba TODAS las penalidades de
-   16avos** si el set queda en **31** (un nombre sin mapear o un slot nulo) o en **33** (una
-   variante de nombre duplicada tipo `"Türkiye"` + `"Turquia"`). Es la misma familia de bugs
-   de mapeo de nombres que arrastra el proyecto. Mitigación: cambiar `==` por `>=` cubre el
-   caso 33 sin costo; el caso 31 requiere revisar el mapeo. No urgente, pero es un landmine
-   silencioso justo en eliminatorias.
+2. **~~`== 32` exacto en `calcular_penalidades`~~ — RESUELTO (2026-06-28).** Las 4 penalidades
+   pasaron a hecho directo + membership (`in`/`not in` + guards `>=`/`grupos_jugados`), sin
+   ningún conteo `==N`. Ver la entrada "Penalidades ... por hecho directo" arriba. Queda solo,
+   como tema **separado de standings**, revisar el filtro del pseudo-grupo de terceros en
+   `obtener_clasificados_por_grupo` (que ya NO afecta a estas penalidades — usan fixtures).
+   *(Texto original conservado abajo para contexto histórico.)*
+   La condición `len(eq_16vos_real) == 32` trababa TODAS las penalidades de 16avos si el set
+   quedaba en **31** (un nombre sin mapear o un slot nulo) o en **33** (una variante de nombre
+   duplicada tipo `"Türkiye"` + `"Turquia"`). Era la misma familia de bugs de mapeo de nombres.
    - **CAUSA RAÍZ CONFIRMADA (2026-06-28, datos reales):** el endpoint `/standings` devuelve
      **13 "grupos"** durante los 16avos — el *ranking de terceros* entra como un grupo más y
      el filtro de `obtener_clasificados_por_grupo` (`"third-placed"`/`"ranking of third"`) NO
