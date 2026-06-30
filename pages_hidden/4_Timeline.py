@@ -3,9 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import os
 
-from utils.data_loader import cargar_todo, foto_participante
-from utils.api_football import clasificar_ronda
-from utils.scoring import PUNTOS, AJUSTES_MANUALES
+from utils.data_loader import cargar_todo, foto_participante, cargar_overrides
+from utils.timeline import construir_evolucion
 
 st.set_page_config(page_title="Timeline", page_icon="📈", layout="wide")
 
@@ -16,107 +15,17 @@ if os.path.exists(css_path):
 
 
 def calcular_evolucion_puntos():
+    """Evolución desde la MISMA fuente que el leaderboard (construir_puntajes truncado
+    por hito). El último punto de cada línea == su Total en la tabla. Retorna (df, hitos)."""
     cargar_todo()
-    resultados = st.session_state.get("resultados", pd.DataFrame())
-    todos_puntajes = st.session_state.get("todos_puntajes", [])
-
-    if resultados.empty or not todos_puntajes:
-        return pd.DataFrame()
-
-    partidos_ordenados = resultados.sort_values("fecha").reset_index(drop=True)
-    evolucion = []
-
-    for puntaje_data in todos_puntajes:
-        part = puntaje_data["participante"]
-        detalle_grupos = puntaje_data.get("detalle_grupos", pd.DataFrame())
-        total_results = puntaje_data.get("total_results", {})
-        equipos_pred_por_ronda = total_results.get("equipos_por_ronda", {}) if isinstance(total_results, dict) else {}
-
-        ajuste_manual_inicial = AJUSTES_MANUALES.get(str(part).strip().upper(), 0)
-        puntos_acum = ajuste_manual_inicial
-        equipos_ya_contados = {}
-
-        evolucion.append({
-            "participante": part,
-            "fecha": pd.Timestamp("2026-06-10", tz="UTC"),
-            "puntos": puntos_acum,
-            "evento": f"Inicio del torneo{' (ajuste manual ' + str(ajuste_manual_inicial) + ')' if ajuste_manual_inicial != 0 else ''}",
-        })
-
-        for _, partido in partidos_ordenados.iterrows():
-            fecha = partido["fecha"]
-            local = partido["equipo_local"]
-            visitante = partido["equipo_visitante"]
-            gl = partido["goles_local"]
-            gv = partido["goles_visitante"]
-            estado = partido["estado"]
-            ronda = clasificar_ronda(str(partido["ronda"]))
-
-            if estado != "FT" or pd.isna(gl) or pd.isna(gv):
-                continue
-
-            gl, gv = int(gl), int(gv)
-            puntos_partido = 0
-            evento = f"{local} {gl}-{gv} {visitante}"
-
-            if ronda == "grupos":
-                if isinstance(detalle_grupos, pd.DataFrame) and not detalle_grupos.empty:
-                    match = detalle_grupos[
-                        (detalle_grupos["equipo_local"] == local) &
-                        (detalle_grupos["equipo_visitante"] == visitante) &
-                        (detalle_grupos["estado"] == "jugado")
-                    ]
-                    if not match.empty:
-                        puntos_partido = int(match.iloc[0]["puntos"])
-            else:
-                equipos_pred = equipos_pred_por_ronda.get(ronda, set())
-                if ronda not in equipos_ya_contados:
-                    equipos_ya_contados[ronda] = set()
-                for equipo in [local, visitante]:
-                    if equipo in equipos_pred and equipo not in equipos_ya_contados[ronda]:
-                        puntos_partido += PUNTOS.get(ronda, 0)
-                        equipos_ya_contados[ronda].add(equipo)
-
-            puntos_acum += puntos_partido
-            evolucion.append({
-                "participante": part,
-                "fecha": fecha,
-                "puntos": puntos_acum,
-                "evento": evento,
-            })
-
-        # Penalidades se aplican cuando se confirman durante el torneo
-        # Revelacion en grupos y Peor pasa grupos: al terminar grupos
-        # Campeon no llega a 4tos: al terminar 4tos
-        # Decepcion llega a semis: al terminar semis
-        # Por simplicidad en la simulacion, distribuimos las penalidades
-        # y bonos al final del torneo
-        pts_extras = (puntaje_data["pts_campeon"] + puntaje_data["pts_tercero"] +
-                     puntaje_data["pts_especiales"] + puntaje_data["pts_penalidades"])
-        
-        # Primero aplicar penalidades reales del torneo (sin duplicar el ajuste manual inicial)
-        penalidades_restantes = puntaje_data["pts_penalidades"] - ajuste_manual_inicial
-        if penalidades_restantes < 0:
-            puntos_acum += penalidades_restantes
-            evolucion.append({
-                "participante": part,
-                "fecha": pd.Timestamp("2026-07-19 12:00:00", tz="UTC"),
-                "puntos": puntos_acum,
-                "evento": f"Penalidades: {penalidades_restantes}",
-            })
-        
-        # Despues aplicar bonos positivos
-        pts_bonos = puntaje_data["pts_campeon"] + puntaje_data["pts_tercero"] + puntaje_data["pts_especiales"]
-        if pts_bonos > 0:
-            puntos_acum += pts_bonos
-            evolucion.append({
-                "participante": part,
-                "fecha": pd.Timestamp("2026-07-20", tz="UTC"),
-                "puntos": puntos_acum,
-                "evento": f"Bonos: +{pts_bonos} (Campeon:{puntaje_data['pts_campeon']}, 3ero:{puntaje_data['pts_tercero']}, Esp:{puntaje_data['pts_especiales']})",
-            })
-
-    return pd.DataFrame(evolucion)
+    return construir_evolucion(
+        st.session_state.get("resultados", pd.DataFrame()),
+        st.session_state.get("apuestas_grupos", pd.DataFrame()),
+        st.session_state.get("categorias_todos", {}),
+        st.session_state.get("total_results_todos", {}),
+        st.session_state.get("todos_puntajes", []),
+        cargar_overrides(),
+    )
 
 
 def main():
@@ -130,7 +39,7 @@ def main():
         return
 
     with st.spinner("📊 Calculando evolución..."):
-        df_evol = calcular_evolucion_puntos()
+        df_evol, hitos = calcular_evolucion_puntos()
 
     if not df_evol.empty and "fecha" in df_evol.columns:
         df_evol["fecha"] = pd.to_datetime(df_evol["fecha"], utc=True, errors="coerce")
@@ -210,21 +119,16 @@ def main():
     st.plotly_chart(fig, use_container_width=True)
 
     # === POSICION POR FASE ===
+    # Solo fases que ya se jugaron (hitos); no mostramos totales en rondas no jugadas.
     st.markdown("---")
     st.markdown("### 📊 Posición por Fase")
 
-    fase_selec = st.select_slider("Seleccioná una fase:", options=[
-        "Fase de Grupos", "16vos de Final", "8vos de Final",
-        "Cuartos de Final", "Semifinales", "Final y Bonos"
-    ], value="Final y Bonos")
+    opciones_fase = [lbl for (lbl, rk, fts) in hitos]
+    fecha_por_fase = {lbl: fts for (lbl, rk, fts) in hitos}
+    fase_selec = st.select_slider("Seleccioná una fase:", options=opciones_fase,
+                                  value=opciones_fase[-1])
 
-    fase_map = {
-        "Fase de Grupos": "2026-06-28", "16vos de Final": "2026-07-04",
-        "8vos de Final": "2026-07-08", "Cuartos de Final": "2026-07-12",
-        "Semifinales": "2026-07-17", "Final y Bonos": "2026-07-22",
-    }
-
-    fecha_corte = pd.Timestamp(fase_map[fase_selec], tz="UTC")
+    fecha_corte = fecha_por_fase[fase_selec]
     tabla_fase = []
     for part in leaderboard["Participante"].tolist():
         df_part = df_evol[(df_evol["participante"] == part) & (df_evol["fecha"] <= fecha_corte)]

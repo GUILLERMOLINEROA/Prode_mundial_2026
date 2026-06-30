@@ -1,5 +1,28 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-28 — Timeline: corta en la ronda en curso y toma puntos de la misma fuente que el leaderboard
+
+El gráfico de evolución (`pages_hidden/4_Timeline.py`) tenía un "abanico" al final y su extremo
+**no coincidía** con el Total del leaderboard. **Raíz única:** calculaba los puntos por una **vía
+paralela** (recompute propio de eliminatoria, que iba atrasado respecto del scoring real) y
+**volcaba** especiales+penalidades+bonos en **fechas fijas de julio** (19-20), no cuando se ganaban
+→ de ahí el salto del extremo derecho (no era proyección de rondas futuras, era el volcado).
+
+**Fix (una sola fuente):** nuevo módulo `utils/timeline.py` con `construir_evolucion(...)`. Por cada
+**hito de ronda que ya empezó**, el total sale de **`construir_puntajes`** sobre `resultados`
+truncado a esa ronda o anteriores (con su `categorias_reales` recomputada para el corte). El hito
+de la ronda **en curso** usa el total del leaderboard (`todos_puntajes`) → el último punto de cada
+línea **es exactamente** su Total. Las rondas no jugadas **no se grafican** (el eje completo
+Inicio→Final queda visible como referencia, vacío a la derecha). Refleja el provisional en vivo,
+igual que el leaderboard. Las secciones "Posición por Fase" y "Movimientos" se restringen a fases
+ya jugadas (sin totales en rondas no jugadas).
+
+Validado con datos reales: corta en 16avos (no dibuja 8vos+), y el extremo == Total del leaderboard
+para los 26 participantes. Test nuevo de la invariante (`tests/test_timeline.py`): el último punto
+de cada participante == su `total` (evita que el cálculo paralelo vuelva). Suite **105 verde**.
+
+---
+
 ## 2026-06-28 — Penalidades de revelación/peor/decepción-semis por hecho directo (cierra el pendiente ==N)
 
 Las 3 penalidades que quedaban con conteo exacto `==N` (el landmine que traba en silencio con un
