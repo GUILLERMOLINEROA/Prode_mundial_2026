@@ -55,6 +55,11 @@ def main():
     with st.sidebar:
         st.session_state["usar_simulacion"] = False
 
+    from utils.timezone_usuario import selector_timezone
+    with st.sidebar:
+        st.divider()
+        tz_usuario = selector_timezone()
+
     # =================================================================
     # CARGA CENTRALIZADA
     # =================================================================
@@ -287,7 +292,7 @@ def main():
 
                 lugar = formato_sede(p.get("estadio"), p.get("ciudad"))
 
-                horarios_txt = formatear_horarios_partido(p.get("fecha"))
+                horarios_txt = formatear_horarios_partido(p.get("fecha"), tz_usuario)
 
                 es_grupo = etiqueta_ronda_visible(p).startswith("Grupo ")
 
@@ -371,7 +376,7 @@ def main():
         cols_prox = st.columns(3)
         for i, (_, p) in enumerate(proximos.iterrows()):
             with cols_prox[i]:
-                horarios_txt = formatear_horarios_partido(p.get("fecha"))
+                horarios_txt = formatear_horarios_partido(p.get("fecha"), tz_usuario)
 
                 lugar = formato_sede(p.get("estadio"), p.get("ciudad"))
 

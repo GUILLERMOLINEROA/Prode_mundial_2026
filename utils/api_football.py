@@ -50,24 +50,30 @@ ESTADO_DISPLAY = {
 ESTADOS_EN_VIVO = {"1H", "2H", "HT", "ET", "BT", "P", "LIVE"}
 ESTADOS_FINALIZADO = {"FT", "AET", "PEN"}
 
-TZ_MEXICO = ZoneInfo("America/Mexico_City")
 TZ_ARG = ZoneInfo("America/Argentina/Buenos_Aires")
-TZ_BR = ZoneInfo("America/Sao_Paulo")
 
-def formatear_horarios_partido(fecha):
+def formatear_horarios_partido(fecha, tz="America/Argentina/Buenos_Aires"):
     """
-    Devuelve string compacto con horarios MX / AR / BR.
+    Devuelve el horario del partido localizado a UNA sola zona horaria.
+
+    Formato: "dd/mm HH:MM (Ciudad)" — ej. "11/06 13:00 (Buenos Aires)".
+    `tz` es un IANA (ej. "America/Sao_Paulo"); usa zonas nombradas, así que
+    respeta DST. Default Argentina y degradación segura: zona inválida -> AR,
+    cualquier error -> "".
     """
     if fecha is None or pd.isna(fecha):
         return ""
     try:
+        zona = ZoneInfo(str(tz))
+    except Exception:
+        zona = TZ_ARG
+    try:
         dt = pd.to_datetime(fecha)
         if getattr(dt, "tzinfo", None) is None:
             dt = dt.tz_localize("UTC")
-        mx = dt.tz_convert(TZ_MEXICO).strftime("%d/%m %H:%M")
-        ar = dt.tz_convert(TZ_ARG).strftime("%d/%m %H:%M")
-        br = dt.tz_convert(TZ_BR).strftime("%d/%m %H:%M")
-        return f"🇲🇽 {mx} | 🇦🇷 {ar} | 🇧🇷 {br}"
+        local = dt.tz_convert(zona)
+        ciudad = getattr(zona, "key", str(tz)).split("/")[-1].replace("_", " ")
+        return f'{local.strftime("%d/%m %H:%M")} ({ciudad})'
     except Exception:
         return ""
 

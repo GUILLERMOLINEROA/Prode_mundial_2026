@@ -18,6 +18,10 @@ def main():
 
     cargar_todo()
 
+    from utils.timezone_usuario import selector_timezone
+    with st.sidebar:
+        tz_usuario = selector_timezone()
+
     resultados = st.session_state.get("resultados", pd.DataFrame())
     apuestas_grupos = st.session_state.get("apuestas_grupos", pd.DataFrame())
     if resultados.empty:
@@ -223,7 +227,7 @@ def main():
                 else:
                     ganador_visit = "color: #C8E600; font-weight: bold;"
 
-        horarios_txt = formatear_horarios_partido(p.get("fecha"))
+        horarios_txt = formatear_horarios_partido(p.get("fecha"), tz_usuario)
         horarios_html = ""
         if horarios_txt:
             horarios_html = (

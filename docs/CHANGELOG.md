@@ -1,5 +1,24 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-30 — Tarjetas: una sola hora localizada a la zona del usuario (con fallback a selector)
+
+Las tarjetas de partidos (En vivo, Próximos, lista de Partidos) mostraban **3 horas fijas**
+(México 🇲🇽 / Argentina 🇦🇷 / Brasil 🇧🇷). Ahora muestran **una sola hora**, localizada a la zona
+horaria de quien abre la app.
+
+- **Detección nativa, sin dependencias nuevas:** `st.context.timezone` (lee el IANA del
+  navegador). Se valida con `ZoneInfo`. Si falla o aún no está disponible, cae a **Argentina**
+  y se ofrece un **selector** en el sidebar para elegir la zona a mano. La elección manual
+  **manda** sobre la detección y se recuerda en `st.session_state`.
+- **Referencia visual honesta:** en vez de banderita (mapear zona→país es impreciso), se muestra
+  el nombre de la ciudad del IANA — ej. `🕒 11/06 13:00 (Buenos Aires)`.
+- **DST-safe:** zonas nombradas (`America/...`), nunca offsets fijos.
+- `utils.api_football.formatear_horarios_partido(fecha, tz=...)` ahora es una función pura que
+  localiza a UNA zona (default Argentina, degradación segura). Nuevo módulo
+  `utils.timezone_usuario` con `resolver_timezone()` + `selector_timezone()`.
+- Nuevo `tests/test_horarios.py`: conversión UTC→zona, **caso DST** (New York invierno UTC−5 /
+  verano UTC−4), fecha naive, ciudad presentable y degradación.
+
 ## 2026-06-30 — Timeline: reparto suave del +N de eliminatoria por día + aviso de total provisorio durante ronda en curso
 
 Sobre la curva diaria (misma fuente que el leaderboard, un punto por día con partidos
