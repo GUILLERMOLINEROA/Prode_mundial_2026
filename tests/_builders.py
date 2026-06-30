@@ -10,8 +10,9 @@ import pandas as pd
 # --- Partidos (estructura `resultados` que usa la app) ---
 
 def partido(local, visitante, gl=None, gv=None, ronda="Group Stage - 1",
-            estado="FT", pen_l=None, pen_v=None):
-    """Una fila de `resultados`. gl/gv = marcador; pen_l/pen_v = tanda de penales."""
+            estado="FT", pen_l=None, pen_v=None, fecha="2026-06-12"):
+    """Una fila de `resultados`. gl/gv = marcador; pen_l/pen_v = tanda de penales.
+    `fecha` solo la usa el Timeline (las demás funciones la ignoran)."""
     return {
         "ronda": ronda,
         "equipo_local": local,
@@ -21,6 +22,7 @@ def partido(local, visitante, gl=None, gv=None, ronda="Group Stage - 1",
         "estado": estado,
         "penales_local": pen_l,
         "penales_visitante": pen_v,
+        "fecha": fecha,
     }
 
 

@@ -58,6 +58,11 @@ def main():
 
     # === GRAFICO PRINCIPAL ===
     st.markdown("### 🏁 Carrera de Puntos")
+    st.caption(
+        "ℹ️ Los puntos de clasificación se reparten a medida que se juega cada partido de "
+        "eliminatoria. Durante una ronda en curso, el extremo de la curva puede quedar por "
+        "debajo del Total de la tabla (la diferencia es el pase aún no repartido); al "
+        "completarse la ronda, vuelven a coincidir.")
 
     fig = go.Figure()
 

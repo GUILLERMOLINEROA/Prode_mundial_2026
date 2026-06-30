@@ -1,5 +1,44 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-30 — Timeline: reparto suave del +N de eliminatoria por día + aviso de total provisorio durante ronda en curso
+
+Sobre la curva diaria (misma fuente que el leaderboard, un punto por día con partidos
+terminados), este ajuste **reparte el +N del pase** a lo largo de los días en que se juega cada
+partido, en vez de aplicarlo todo junto al cerrar grupos. Resultado: pendiente suave durante
+16avos (la curva que se quería), sin volver al cálculo paralelo.
+
+`utils.timeline.construir_evolucion` separa **dos vistas a propósito** y las suma por día:
+total = grupos acumulados (de `detalle_grupos`) + **+N del pase repartido** + **resto correcto
+en su día**.
+
+- **Pase (+N) — repartido:** se calcula con `calcular_puntos_eliminatorias` sobre el cuadro
+  armado **solo con partidos terminados** hasta el día. Así el +N de un equipo aparece el día
+  que juega/gana su partido de esa ronda. Atribución **cosmética**: el +1 de 16avos se gana al
+  clasificar (fin de grupos) pero se muestra el día del partido de 16avos, para suavizar.
+- **Penalidades / especiales / campeón / 3ero — NO se reparten:** salen de `construir_puntajes`
+  sobre el snapshot **con presencia** del cuadro de 16avos (publicado al cerrar grupos). Esto es
+  clave: con "solo terminados" la penalidad de revelación/peor (`len(eq_16vos)>=24` + "no está
+  en el cuadro") daría **falsos −20 que parpadean** mientras se llena el bracket. Con presencia,
+  caen en su día real y sin falsos positivos (revelación/peor en fin de grupos; el −20 del
+  campeón el día que pierde su partido). Por día: `total_pase = elim_finished`, `resto =
+  total_presencia − elim_presencia`.
+- **Aviso en el gráfico:** durante una ronda en curso el extremo de la curva queda por DEBAJO
+  del Total de la tabla (por el pase aún no repartido). Una nota (`st.caption`) lo aclara para
+  que no se lea como bug; al completarse la ronda vuelven a coincidir.
+- **Invariante (cambio a propósito):** antes era "sin vivo, último == Total" siempre. Ahora:
+  con la ronda en curso **completa**, último == Total; con la ronda **incompleta**, extremo ==
+  Total − (pase no repartido). Reescrito el test de invariante en sus dos casos (no borrado).
+- **Costo:** **~1.75 s** (dos vistas por día: presencia para el resto + terminados para el
+  pase). Sigue lejísimos de los 112 s del prototipo ingenuo.
+
+Validado con datos reales (16avos en curso, 4 de 16 partidos jugados): 20 puntos-fecha, corta
+el 30/06 (no dibuja futuro), grupos suben suave día a día, el bajón de penalidad cae el 28/06
+(revelación/peor) y los campeones caen el día que pierden. La diferencia extremo-vs-Total de
+cada participante es **exactamente** el +1 de los clasificados cuyo 16avos aún no se jugó
+(p.ej. +19 = 19 equipos correctos sin jugar). Suite **108 verde**.
+
+---
+
 ## 2026-06-28 — Timeline: corta en la ronda en curso y toma puntos de la misma fuente que el leaderboard
 
 El gráfico de evolución (`pages_hidden/4_Timeline.py`) tenía un "abanico" al final y su extremo
