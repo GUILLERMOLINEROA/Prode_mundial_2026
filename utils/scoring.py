@@ -50,9 +50,7 @@ PUNTOS = {
     "Peor Equipo": 8,
 }
 
-AJUSTES_MANUALES = {
-    "ALDO": -10,   # penalidad hardcodeada
-}
+AJUSTES_MANUALES = {}
 
 PENALIDADES = {
     "revelacion_queda_grupos": -20,
