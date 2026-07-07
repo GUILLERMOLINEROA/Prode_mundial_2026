@@ -37,9 +37,19 @@ class TestPuntuacionTotal(unittest.TestCase):
     def test_ajuste_manual_resta_del_total(self):
         # Testea el MECANISMO de ajuste manual con un código sintético (TESTPEN), no una
         # sanción real: agregar/retirar entradas de AJUSTES_MANUALES no debe romper la suite.
+        # Valor int (sin motivo) -> texto genérico.
         p = _puntaje("TESTPEN", 0, 1)  # base 0
         self.assertEqual(p["total"], -10)
         self.assertTrue(any("ajuste manual" in r.lower() for r in p["razones_penalidad"]))
+
+    @patch.dict("utils.scoring.AJUSTES_MANUALES",
+                {"TESTPEN": (-50, "motivo de prueba")}, clear=True)
+    def test_ajuste_manual_con_motivo_usa_ese_texto(self):
+        # Valor tupla (puntos, motivo) -> el texto de PENALIDADES usa el motivo, no el genérico.
+        p = _puntaje("TESTPEN", 0, 1)  # base 0
+        self.assertEqual(p["total"], -50)
+        self.assertTrue(any("motivo de prueba" in r for r in p["razones_penalidad"]))
+        self.assertFalse(any("ajuste manual" in r.lower() for r in p["razones_penalidad"]))
 
 
 class TestLeaderboard(unittest.TestCase):

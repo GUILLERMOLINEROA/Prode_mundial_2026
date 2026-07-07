@@ -29,7 +29,7 @@ import collections
 import pandas as pd
 
 from utils.api_football import clasificar_ronda
-from utils.scoring import AJUSTES_MANUALES, calcular_puntos_eliminatorias
+from utils.scoring import ajuste_manual_de, calcular_puntos_eliminatorias
 from utils.special_categories import calcular_todas_las_categorias, grupos_finalizados
 from utils.data_loader import construir_puntajes, extraer_equipos_reales_por_ronda
 
@@ -128,7 +128,7 @@ def construir_evolucion(resultados, apuestas_grupos, categorias_todos,
         fecha_map[(p.get("equipo_local"), p.get("equipo_visitante"))] = p["_dia"]
     grupos_cum = _grupos_acumulado(todos_puntajes, fecha_map, dias)
 
-    ajustes = {pj["participante"]: AJUSTES_MANUALES.get(str(pj["participante"]).strip().upper(), 0)
+    ajustes = {pj["participante"]: ajuste_manual_de(pj["participante"])[0]
                for pj in todos_puntajes}
 
     filas = []

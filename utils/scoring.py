@@ -51,11 +51,25 @@ PUNTOS = {
 }
 
 # Sanciones manuales dispuestas por la comisión. Clave = código de participante en
-# MAYÚSCULAS (se compara con participante.strip().upper()); valor = puntos a sumar
-# (negativo = penalidad). Para RETIRAR una sanción, borrá su línea y nada más.
+# MAYÚSCULAS (se compara con participante.strip().upper()). Valor = puntos a sumar
+# (negativo = penalidad), o una tupla (puntos, motivo) para personalizar el texto que se
+# muestra en PENALIDADES. Para RETIRAR una sanción, borrá su línea y nada más.
 AJUSTES_MANUALES = {
-    "JRUQ": -50,  # Juan Ruquet (grupo oficina): sanción de la comisión por decir "Siamo Fuori".
+    "JRUQ": (-50, 'Sanción a Juan Ruquet por gritar "Siamo Fuori"'),  # comisión, grupo oficina
 }
+
+
+def ajuste_manual_de(participante):
+    """(puntos, motivo) del ajuste manual de un participante, o (0, "") si no tiene.
+
+    Acepta el valor de AJUSTES_MANUALES como int (puntos, sin motivo) o como tupla
+    (puntos, motivo). `motivo` vacío -> el texto de PENALIDADES cae al genérico."""
+    raw = AJUSTES_MANUALES.get(str(participante).strip().upper())
+    if raw is None:
+        return 0, ""
+    if isinstance(raw, (tuple, list)):
+        return raw[0], (raw[1] if len(raw) > 1 else "")
+    return raw, ""
 
 PENALIDADES = {
     "revelacion_queda_grupos": -20,
@@ -424,12 +438,13 @@ def calcular_puntuacion_total(
         pts_especiales + pts_penalidades
     )
     
-    ajuste_manual = AJUSTES_MANUALES.get(str(participante).strip().upper(), 0)
+    ajuste_manual, motivo_ajuste = ajuste_manual_de(participante)
     if ajuste_manual != 0:
         pts_penalidades += ajuste_manual
         total += ajuste_manual
         try:
-            razones_pen.append(f"⚙️ Ajuste manual para {participante}: {ajuste_manual} pts")
+            texto = motivo_ajuste or f"Ajuste manual para {participante}"
+            razones_pen.append(f"⚙️ {texto}: {ajuste_manual} pts")
         except Exception:
             pass
 

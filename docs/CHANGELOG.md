@@ -1,5 +1,20 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-30 — Ajuste manual: motivo personalizable por sanción (texto propio de JRUQ)
+
+El texto que se muestra en PENALIDADES era genérico ("⚙️ Ajuste manual para JRUQ: -50 pts").
+Ahora cada sanción puede llevar su **motivo**: el valor de `AJUSTES_MANUALES` acepta un `int`
+(puntos, texto genérico) **o** una tupla `(puntos, motivo)`. Un helper `ajuste_manual_de()`
+normaliza ambas formas y lo usan tanto `calcular_puntuacion_total` como `utils/timeline.py`.
+
+- JRUQ pasa a `(-50, 'Sanción a Juan Ruquet por gritar "Siamo Fuori"')` → en PENALIDADES se ve
+  "⚙️ Sanción a Juan Ruquet por gritar \"Siamo Fuori\": -50 pts".
+- Retirar una sanción sigue siendo borrar su línea; el mecanismo genérico (int) no cambia.
+- Test nuevo del motivo (tupla → usa ese texto, no el genérico); los tests con `int` quedan
+  intactos. Suite **116 verde**.
+
+---
+
 ## 2026-06-30 — Sanción manual: -50 a JRUQ (Juan Ruquet)
 
 La comisión dispuso una sanción de **-50** a JRUQ (Juan Ruquet, grupo oficina) por decir
