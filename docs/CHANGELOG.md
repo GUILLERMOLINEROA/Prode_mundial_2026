@@ -1,5 +1,16 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-30 — Sanción manual: -50 a JRUQ (Juan Ruquet)
+
+La comisión dispuso una sanción de **-50** a JRUQ (Juan Ruquet, grupo oficina) por decir
+"Siamo Fuori". Se carga como `"JRUQ": -50` en `AJUSTES_MANUALES` (`utils/scoring.py`), el mismo
+mecanismo de ajuste manual que ya existía. El ajuste se resta del total y queda registrado en
+`razones_penalidad` ("⚙️ Ajuste manual…"). Para **retirarla** basta borrar esa línea: no hay
+nada más que tocar. La suite sigue **115 verde** (los tests de ajuste manual ya no dependen de
+sanciones reales, ver entrada anterior).
+
+---
+
 ## 2026-06-30 — Tests: desacoplar el test de ajuste manual de las sanciones reales
 
 Un commit anterior vació `AJUSTES_MANUALES` (retiró la sanción de ALDO) y dejó dos tests en

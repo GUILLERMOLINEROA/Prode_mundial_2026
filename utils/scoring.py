@@ -50,7 +50,12 @@ PUNTOS = {
     "Peor Equipo": 8,
 }
 
-AJUSTES_MANUALES = {}
+# Sanciones manuales dispuestas por la comisión. Clave = código de participante en
+# MAYÚSCULAS (se compara con participante.strip().upper()); valor = puntos a sumar
+# (negativo = penalidad). Para RETIRAR una sanción, borrá su línea y nada más.
+AJUSTES_MANUALES = {
+    "JRUQ": -50,  # Juan Ruquet (grupo oficina): sanción de la comisión por decir "Siamo Fuori".
+}
 
 PENALIDADES = {
     "revelacion_queda_grupos": -20,
