@@ -1,5 +1,6 @@
 """Función maestra (calcular_puntuacion_total) y armado del leaderboard."""
 import unittest
+from unittest.mock import patch
 
 from utils.scoring import calcular_puntuacion_total, generar_leaderboard
 from tests._builders import df_apuestas, df_resultados, partido, apuesta, total_results
@@ -32,8 +33,11 @@ class TestPuntuacionTotal(unittest.TestCase):
         p = _puntaje("BAJO", 0, 1)  # marcador al revés, sin pred de elim
         self.assertEqual(p["total"], 0)
 
-    def test_ajuste_manual_ALDO_resta_10(self):
-        p = _puntaje("ALDO", 0, 1)  # base 0
+    @patch.dict("utils.scoring.AJUSTES_MANUALES", {"TESTPEN": -10}, clear=True)
+    def test_ajuste_manual_resta_del_total(self):
+        # Testea el MECANISMO de ajuste manual con un código sintético (TESTPEN), no una
+        # sanción real: agregar/retirar entradas de AJUSTES_MANUALES no debe romper la suite.
+        p = _puntaje("TESTPEN", 0, 1)  # base 0
         self.assertEqual(p["total"], -10)
         self.assertTrue(any("ajuste manual" in r.lower() for r in p["razones_penalidad"]))
 

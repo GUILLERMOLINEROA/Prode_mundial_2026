@@ -1,5 +1,24 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-06-30 — Tests: desacoplar el test de ajuste manual de las sanciones reales
+
+Un commit anterior vació `AJUSTES_MANUALES` (retiró la sanción de ALDO) y dejó dos tests en
+rojo que afirmaban `ALDO == -10`. La causa raíz es de diseño: esos tests verificaban una
+**entrada concreta** de la tabla de sanciones, así que cada alta/baja de una sanción real
+rompía la suite.
+
+Ahora testean el **mecanismo**, no un dato de producción: con
+`@patch.dict("utils.scoring.AJUSTES_MANUALES", {"TESTPEN": -10}, clear=True)` inyectan un
+código sintético `TESTPEN` y verifican que el ajuste se resta del total y aparece en
+`razones_penalidad`. `patch.dict` muta el dict in-place, por lo que el `from utils.scoring
+import AJUSTES_MANUALES` de `utils/timeline.py` (misma referencia) también ve el override.
+Agregar o retirar sanciones reales ya no puede volver a romper estos tests. Suite **115 verde**.
+
+- `tests/test_total_y_leaderboard.py`: `test_ajuste_manual_ALDO_resta_10` → `test_ajuste_manual_resta_del_total` (TESTPEN, patch.dict).
+- `tests/test_timeline.py`: `test_ajuste_manual_arranca_en_su_valor` ahora usa TESTPEN + patch.dict.
+
+---
+
 ## 2026-06-30 — Tarjetas: una sola hora localizada a la zona del usuario (con fallback a selector)
 
 Las tarjetas de partidos (En vivo, Próximos, lista de Partidos) mostraban **3 horas fijas**

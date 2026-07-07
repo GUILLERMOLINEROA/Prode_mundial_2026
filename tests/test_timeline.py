@@ -15,6 +15,7 @@ Invariantes clave (evitan que vuelva el cálculo paralelo / los puntos fantasma)
    penalidades NO se reparten: usan el cuadro con presencia, caen en su día real).
 """
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -130,17 +131,19 @@ class TestTimelineDiario(unittest.TestCase):
         self.assertEqual(int(pre), 0)
         self.assertEqual(int(post), -20)
 
+    @patch.dict("utils.scoring.AJUSTES_MANUALES", {"TESTPEN": -10}, clear=True)
     def test_ajuste_manual_arranca_en_su_valor(self):
-        # ALDO -10: el punto inicial es -10.
+        # El punto inicial arranca en el ajuste manual. Testea el MECANISMO con un código
+        # sintético (TESTPEN); no depende de ninguna sanción real cargada en producción.
         resultados = df_resultados([
             partido("ARG", "BRA", 1, 0, ronda="Group Stage - 1", estado="FT", fecha="2026-06-12"),
         ])
-        apuestas = df_apuestas([apuesta("ALDO", "ARG", "BRA", 0, 1)])  # falla -> 0 de grupos
-        cats = {"ALDO": {}}
-        trs = {"ALDO": total_results()}
+        apuestas = df_apuestas([apuesta("TESTPEN", "ARG", "BRA", 0, 1)])  # falla -> 0 de grupos
+        cats = {"TESTPEN": {}}
+        trs = {"TESTPEN": total_results()}
         todos = _con_total(resultados, apuestas, cats, trs)
         df, _ = construir_evolucion(resultados, apuestas, cats, trs, todos, {})
-        inicio = df[(df["participante"] == "ALDO") & (df["evento"] == "Inicio Grupos")].iloc[0]
+        inicio = df[(df["participante"] == "TESTPEN") & (df["evento"] == "Inicio Grupos")].iloc[0]
         self.assertEqual(int(inicio["puntos"]), -10)
 
 
