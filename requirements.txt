@@ -1,6 +1,13 @@
-streamlit
-pandas
-plotly
-openpyxl
-requests
+# Stack PINNEADO a un combo estable con wheels cp312 (Python 3.12; ver runtime.txt).
+# Motivo: sin pins, Streamlit Cloud (que fuerza Python 3.14) resolvía el stack nativo
+# a lo último (pandas 3 / numpy 2.5 / pyarrow 25) y la app segfaulteaba en runtime.
+# Estas versiones tienen wheel cp312 verificado (uv, linux) y la suite pasa con ellas.
+# Para actualizar un pin, cambiá la línea y re-verificá la resolución (uv pip compile).
+streamlit==1.59.1
+pandas==2.2.3
+numpy==1.26.4
+pyarrow==17.0.0
+plotly==6.9.0
+openpyxl==3.1.5
+requests==2.34.2
 google-generativeai==0.8.6

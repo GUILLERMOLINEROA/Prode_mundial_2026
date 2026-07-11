@@ -1,5 +1,43 @@
 # Registro de cambios — PRODE Mundial 2026
 
+## 2026-07-11 — Deploy: fix del segfault en Streamlit Cloud (pin de Python 3.12 + stack estable)
+
+Las 4 apps empezaron a segfaultear en Cloud: arrancaban, renderizaban un par de páginas y
+recién ahí crasheaban con `Segmentation fault` en `run-streamlit.sh` — un crash **nativo (C)**,
+no un error de Python nuestro.
+
+**Causa raíz (drift de versiones sobre Python 3.14).** `requirements.txt` tenía todo sin
+pinnear salvo `google-generativeai`. Sin `runtime.txt`, Cloud fuerza **Python 3.14** y `uv`
+resolvía el stack nativo a lo último: **pandas 3.0.3 / numpy 2.5.1 / pyarrow 25.0.0** (verificado
+localmente con `uv pip compile ... --python-version 3.14`). Esa combinación bleeding-edge de
+extensiones compiladas sobre un Python recién salido es el origen del segfault. Como no estaba
+pinneado, cada reboot re-resolvía a la última versión → por eso venía andando y de golpe reventó.
+
+**Fix (estrategia A): bajar a Python 3.12 + pinnear el stack.**
+- `runtime.txt` con `3.12`.
+- `requirements.txt` pinneado a un combo con **wheel cp312 verificado**: streamlit 1.59.1,
+  pandas 2.2.3, numpy 1.26.4, pyarrow 17.0.0, plotly 6.9.0, openpyxl 3.1.5, requests 2.34.2,
+  google-generativeai 0.8.6 (este último **sin tocar**, la migración a `google-genai` queda
+  fuera de scope).
+
+**Por qué A y no quedarse en 3.14 (plan B):** el sospechoso es justamente el stack nuevo sobre
+3.14, así que lo más directo es sacárselo de encima, no apostar a que otro build de 3.14 sea
+estable. **Riesgo asumido y documentado:** si Cloud ignora el pin de 3.12 y clava 3.14, el stack
+viejo **no tiene wheel cp314** (`pandas==2.2.3 has no usable wheels`, verificado) → el build
+**falla ruidoso** en vez de segfaultear en silencio. Se mitiga fijando Python 3.12 también en
+**Advanced settings** de cada app (pin de plataforma, más confiable que `runtime.txt`). Si aun
+así el build explota por 3.14, **plan B** = pinnear a las versiones estables más nuevas CON wheel
+cp314.
+
+**Validación local (y su límite):** con `uv` (mismo resolver que Cloud) se verificó que el combo
+resuelve **con wheels** para cp312/linux; se creó un venv **Python 3.12** real, se instaló el
+stack y la **suite pasó (116 verde)** — o sea el código anda con pandas 2.2.3/numpy 1.26.4 (hoy
+corría sobre pandas 3). Límite: localmente **no se puede reproducir** el 3.14 forzado de Cloud ni
+el segfault; la validación local prueba "resuelve y arranca", no "el segfault desapareció". El
+test real es el reboot en Cloud.
+
+---
+
 ## 2026-06-30 — Ajuste manual: motivo personalizable por sanción (texto propio de JRUQ)
 
 El texto que se muestra en PENALIDADES era genérico ("⚙️ Ajuste manual para JRUQ: -50 pts").
