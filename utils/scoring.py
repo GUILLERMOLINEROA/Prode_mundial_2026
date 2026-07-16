@@ -55,7 +55,7 @@ PUNTOS = {
 # (negativo = penalidad), o una tupla (puntos, motivo) para personalizar el texto que se
 # muestra en PENALIDADES. Para RETIRAR una sanción, borrá su línea y nada más.
 AJUSTES_MANUALES = {
-    "JRUQ": (-50, 'Sanción a Juan Ruquet por gritar "Siamo Fuori"'),  # comisión, grupo oficina
+    "JRUQ": (3, "Premio a Juan Ruquet por su intachable comportamiento y apoyo a la selección"),
 }
 
 
