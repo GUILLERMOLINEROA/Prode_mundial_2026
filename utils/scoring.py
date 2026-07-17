@@ -56,6 +56,7 @@ PUNTOS = {
 # muestra en PENALIDADES. Para RETIRAR una sanción, borrá su línea y nada más.
 AJUSTES_MANUALES = {
     "JRUQ": (3, "Premio a Juan Ruquet por su intachable comportamiento y apoyo a la selección"),
+    "FASA": (1, "Punto Extra por comentarios fomentando el Espíritu Mundialista y predicción de triunfo épico con gol al último minuto en la semifinal"),
 }
 
 
