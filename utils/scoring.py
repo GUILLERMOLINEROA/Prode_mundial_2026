@@ -249,10 +249,10 @@ def calcular_puntos_campeon_y_tercero(
     campeon_pred = total_results_pred.get("campeon", "")
     tercero_pred = total_results_pred.get("tercero", "")
     
-    if campeon_pred and campeon_real and campeon_pred.lower() == campeon_real.lower():
+    if campeon_pred and campeon_real and _igual_texto(campeon_pred, campeon_real):
         pts_campeon = PUNTOS["campeon"]
     
-    if tercero_pred and tercero_real and tercero_pred.lower() == tercero_real.lower():
+    if tercero_pred and tercero_real and _igual_texto(tercero_pred, tercero_real):
         pts_tercero = PUNTOS["3ero"]
     
     return pts_campeon, pts_tercero
@@ -274,7 +274,7 @@ def calcular_puntos_categorias(
         pred = categorias_pred.get(cat, "").strip()
         real = categorias_reales.get(cat, "").strip()
         
-        if pred and real and pred.lower() == real.lower():
+        if pred and real and _igual_texto(pred, real):
             puntos += PUNTOS[cat]
             aciertos[cat] = True
         else:
@@ -286,6 +286,24 @@ def calcular_puntos_categorias(
 # =============================================================================
 # PENALIDADES
 # =============================================================================
+
+
+def _norm_text(valor):
+    s = str(valor or "").strip().lower()
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return " ".join(s.split())
+
+def _igual_texto(a, b):
+    na = _norm_text(a)
+    nb = _norm_text(b)
+    return bool(na) and na == nb
+
+def _in_norm(valor, opciones):
+    nv = _norm_text(valor)
+    if not nv:
+        return False
+    return any(_norm_text(op) == nv for op in (opciones or set()))
 
 def _es_no_apuesta(valor: str) -> bool:
     """
@@ -348,9 +366,9 @@ def calcular_penalidades(
     #    Se saltea si el participante eligió no apostar (p.ej. "No hay Revelación").
     revelacion = categorias_pred.get("Revelación", "").strip()
     if (revelacion and not _es_no_apuesta(revelacion)
-            and revelacion in grupos_jugados
+            and _in_norm(revelacion, grupos_jugados)
             and len(eq_16vos_real) >= 24
-            and revelacion not in eq_16vos_real):
+            and not _in_norm(revelacion, eq_16vos_real)):
         pen_total += PENALIDADES["revelacion_queda_grupos"]
         razones.append(
             f"🪦 Tu revelación ({revelacion}) se quedó en grupos: "
@@ -361,7 +379,7 @@ def calcular_penalidades(
     #    (perdedor de un 16avos/8vos TERMINADO, o eliminado en grupos). Hecho directo,
     #    sin esperar a que la API arme cuartos. Nunca en vivo.
     campeon_pred = categorias_pred.get("Campeon", "").strip()
-    if campeon_pred and campeon_pred in eliminados_pre_4tos:
+    if campeon_pred and _in_norm(campeon_pred, eliminados_pre_4tos):
         pen_total += PENALIDADES["campeon_no_llega_4tos"]
         razones.append(
             f"💀 Tu campeón ({campeon_pred}) no llegó ni a cuartos: "
@@ -371,7 +389,7 @@ def calcular_penalidades(
     # 3. Peor equipo pasa de grupos: membership directa (peor in eq_16vos). El `in` no
     #    da falso positivo por bracket incompleto. Se saltea el centinela de no-apuesta.
     peor = categorias_pred.get("Peor Equipo", "").strip()
-    if peor and not _es_no_apuesta(peor) and peor in eq_16vos_real:
+    if peor and not _es_no_apuesta(peor) and _in_norm(peor, eq_16vos_real):
         pen_total += PENALIDADES["peor_pasa_grupos"]
         razones.append(
             f"😂 Tu 'peor equipo' ({peor}) pasó de grupos: "
@@ -381,7 +399,7 @@ def calcular_penalidades(
     # 4. Decepción llega a semis: membership directa (decepcion in eq_semis) -> dispara
     #    apenas la decepción gana su 4to, sin esperar a los otros 3 semifinalistas.
     decepcion = categorias_pred.get("Decepción", "").strip()
-    if decepcion and decepcion in eq_semis_real:
+    if decepcion and _in_norm(decepcion, eq_semis_real):
         pen_total += PENALIDADES["decepcion_llega_semis"]
         razones.append(
             f"🤡 Tu decepción ({decepcion}) llegó a SEMIS: "
