@@ -258,6 +258,10 @@ def cargar_todo():
         if not categorias_reales.get("Goleador"):
             categorias_reales["Goleador"] = cat_sim.get("Goleador", "")
 
+    # Overrides manuales oficiales del cierre del torneo
+    categorias_reales["Figura"] = "Rodri Hernandez"
+    categorias_reales["Goleador"] = "Mbappe"
+
     # Puntajes vía builder compartido (misma lógica de 16avos que los mails).
     todos_puntajes, campeon_real, tercero_real, _eq_reales = construir_puntajes(
         resultados, apuestas_grupos, categorias_todos, total_results_todos, categorias_reales,
